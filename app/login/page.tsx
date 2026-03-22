@@ -71,7 +71,7 @@ export default function LoginPage() {
       {/* Right panel */}
       <div className="flex flex-1 flex-col items-center justify-center p-8 relative overflow-hidden">
         {/* Tiles background — mais sutil no painel do form */}
-        <div className="absolute inset-0 opacity-10">
+        <div className="absolute inset-0 opacity-10 pointer-events-none">
           <Tiles rows={20} cols={6} tileSize="lg" tileClassName="border-white/10" />
         </div>
         <div className="w-full max-w-sm">

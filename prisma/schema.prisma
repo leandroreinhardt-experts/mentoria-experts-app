@@ -1,0 +1,336 @@
+// ============================================================
+// MENTORIA EXPERTS — Schema Prisma Completo
+// Banco: PostgreSQL via Supabase
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Plano {
+  START
+  PRO
+  ELITE
+}
+
+enum StatusAluno {
+  ATIVO
+  APROVADO
+  CHURN
+  INATIVO
+}
+
+enum FaseMentoria {
+  ONBOARDING
+  PRE_EDITAL
+  POS_EDITAL
+  PROXIMO_VENCIMENTO
+}
+
+enum NivelAcesso {
+  ADMIN
+  MEMBRO
+}
+
+enum UrgenciaTarefa {
+  BAIXA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum StatusTarefa {
+  A_FAZER
+  EM_ANDAMENTO
+  CONCLUIDA
+}
+
+enum TipoTarefa {
+  ONBOARDING_ACESSO_ESTRATEGIA
+  ONBOARDING_LISTA_TRANSMISSAO
+  ONBOARDING_PLANO_ESTUDOS
+  ONBOARDING_REUNIAO
+  FOLLOWUP
+  MANUAL
+}
+
+enum MotivoChurn {
+  RESCISAO_SOLICITADA
+  VENCIMENTO_SEM_RENOVACAO
+  OUTRO
+}
+
+// ============================================================
+// MEMBROS DA EQUIPE (autenticação via NextAuth)
+// ============================================================
+
+model MembroEquipe {
+  id            String      @id @default(cuid())
+  nome          String
+  email         String      @unique
+  senha         String      // hash bcrypt
+  cargo         String?
+  nivelAcesso   NivelAcesso @default(MEMBRO)
+  ativo         Boolean     @default(true)
+  criadoEm      DateTime    @default(now())
+  atualizadoEm  DateTime    @updatedAt
+
+  // Relações
+  tarefasResponsavel       Tarefa[]       @relation("TarefaResponsavel")
+  followUpsRealizados      FollowUp[]
+  analisesPlanosRealizadas AnalisePlano[]
+  comentarios              Comentario[]
+  sessoes                  Sessao[]
+  mudancasFase             MudancaFase[]  @relation("MudancaFaseAutor")
+  alunosResponsavel        Aluno[]        @relation("AlunoResponsavelAcomp")
+
+  @@map("membros_equipe")
+}
+
+// NextAuth — Sessões
+model Sessao {
+  id           String      @id @default(cuid())
+  sessionToken String      @unique
+  membroId     String
+  expires      DateTime
+  membro       MembroEquipe @relation(fields: [membroId], references: [id], onDelete: Cascade)
+
+  @@map("sessoes")
+}
+
+// ============================================================
+// ALUNOS
+// ============================================================
+
+model Aluno {
+  id                    String       @id @default(cuid())
+  nome                  String
+  cpf                   String       @unique
+  email                 String?
+  whatsapp              String?
+  dataEntrada           DateTime
+  dataVencimento        DateTime
+  plano                 Plano
+  statusAtual           StatusAluno  @default(ATIVO)
+  faseAtual             FaseMentoria @default(ONBOARDING)
+  faseManualOverride    Boolean      @default(false)  // true = fase foi sobrescrita manualmente
+  cursoPrincipal        String?
+  plataformaQuestoes    String?
+  areaEstudo            String?
+  dataProva             DateTime?
+  linkTutory            String?
+  dataUltimaAnalisePlano DateTime?
+  dataUltimoFollowUp    DateTime?
+  incluiAcessoEstrategia Boolean     @default(false)  // define se tarefa de acesso ao Estratégia é criada
+  onboardingRespostas   Json?        // { pergunta: string, resposta: string }[]
+  responsavelAcompId    String?      // membro responsável pelo acompanhamento do aluno
+  criadoEm              DateTime     @default(now())
+  atualizadoEm          DateTime     @updatedAt
+
+  // Relações
+  responsavelAcomp  MembroEquipe? @relation("AlunoResponsavelAcomp", fields: [responsavelAcompId], references: [id])
+  tarefas           Tarefa[]
+  followUps         FollowUp[]
+  analisesPlanos    AnalisePlano[]
+  mudancasFase      MudancaFase[]
+  comentarios       Comentario[]
+  registroChurn     RegistroChurn?
+  registroAprovacao RegistroAprovacao?
+
+  @@index([statusAtual])
+  @@index([faseAtual])
+  @@index([plano])
+  @@index([dataVencimento])
+  @@index([dataUltimoFollowUp])
+  @@map("alunos")
+}
+
+// ============================================================
+// FASES — histórico de mudanças
+// ============================================================
+
+model MudancaFase {
+  id          String       @id @default(cuid())
+  alunoId     String
+  fasAnterior FaseMentoria?
+  faseNova    FaseMentoria
+  motivo      String?      // preenchido quando sobrescrita manual
+  automatica  Boolean      @default(true)
+  autorId     String?
+  criadoEm   DateTime     @default(now())
+
+  aluno  Aluno        @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  autor  MembroEquipe? @relation("MudancaFaseAutor", fields: [autorId], references: [id])
+
+  @@index([alunoId])
+  @@map("mudancas_fase")
+}
+
+// ============================================================
+// FOLLOW-UPS
+// ============================================================
+
+model FollowUp {
+  id           String   @id @default(cuid())
+  alunoId      String
+  responsavelId String
+  observacao   String?
+  realizadoEm  DateTime @default(now())
+  criadoEm     DateTime @default(now())
+
+  aluno       Aluno        @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  responsavel MembroEquipe @relation(fields: [responsavelId], references: [id])
+
+  @@index([alunoId])
+  @@index([realizadoEm])
+  @@map("follow_ups")
+}
+
+// ============================================================
+// ANÁLISES DO PLANO DE ESTUDOS
+// ============================================================
+
+model AnalisePlano {
+  id            String   @id @default(cuid())
+  alunoId       String
+  responsavelId String
+  observacao    String?
+  realizadaEm   DateTime @default(now())
+  criadoEm      DateTime @default(now())
+
+  aluno       Aluno        @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  responsavel MembroEquipe @relation(fields: [responsavelId], references: [id])
+
+  @@index([alunoId])
+  @@index([realizadaEm])
+  @@map("analises_plano")
+}
+
+// ============================================================
+// TAREFAS
+// ============================================================
+
+model Tarefa {
+  id              String         @id @default(cuid())
+  titulo          String
+  descricao       String?
+  tipo            TipoTarefa     @default(MANUAL)
+  alunoId         String?        // null = tarefa sem vínculo a aluno
+  responsavelId   String?
+  prazo           DateTime?
+  urgencia        UrgenciaTarefa @default(MEDIA)
+  status          StatusTarefa   @default(A_FAZER)
+  urgenciaAjustadaAutomaticamente Boolean @default(false)
+  concluidaEm     DateTime?
+  parentId        String?        // null = tarefa principal; preenchido = subtarefa
+  criadoEm        DateTime       @default(now())
+  atualizadoEm    DateTime       @updatedAt
+
+  aluno       Aluno?        @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  responsavel MembroEquipe? @relation("TarefaResponsavel", fields: [responsavelId], references: [id])
+  parent      Tarefa?       @relation("Subtarefas", fields: [parentId], references: [id], onDelete: Cascade)
+  subtarefas  Tarefa[]      @relation("Subtarefas")
+
+  @@index([alunoId])
+  @@index([responsavelId])
+  @@index([status])
+  @@index([prazo])
+  @@index([parentId])
+  @@index([status, prazo])
+  @@map("tarefas")
+}
+
+// ============================================================
+// COMENTÁRIOS / CHAT DO PERFIL DO ALUNO
+// ============================================================
+
+model Comentario {
+  id        String   @id @default(cuid())
+  alunoId   String
+  autorId   String
+  texto     String
+  mencoes   String[] // array de IDs de membros mencionados (@nome)
+  criadoEm  DateTime @default(now())
+
+  aluno Aluno        @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  autor MembroEquipe @relation(fields: [autorId], references: [id])
+
+  @@map("comentarios")
+}
+
+// ============================================================
+// CHURN
+// ============================================================
+
+model RegistroChurn {
+  id         String      @id @default(cuid())
+  alunoId    String      @unique
+  motivo     MotivoChurn
+  observacao String?
+  dataChurn  DateTime    @default(now())
+  criadoEm   DateTime    @default(now())
+
+  aluno Aluno @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+
+  @@map("registros_churn")
+}
+
+// ============================================================
+// APROVAÇÕES
+// ============================================================
+
+model RegistroAprovacao {
+  id             String   @id @default(cuid())
+  alunoId        String   @unique
+  concurso       String   // nome do concurso / cargo
+  dataAprovacao  DateTime
+  observacao     String?
+  criadoEm       DateTime @default(now())
+
+  aluno Aluno @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+
+  @@map("registros_aprovacao")
+}
+
+// ============================================================
+// FILA DIÁRIA (snapshot da distribuição calculada)
+// ============================================================
+
+// Essa tabela armazena a distribuição planejada pelo motor de fila.
+// Ela é recalculada toda madrugada (cron job) ou quando acionada manualmente.
+
+model FilaDiaria {
+  id        String   @id @default(cuid())
+  alunoId   String
+  data      DateTime @db.Date  // data do slot (ex: 2025-03-20)
+  concluida Boolean  @default(false)
+  criadoEm  DateTime @default(now())
+
+  @@unique([alunoId, data])   // um aluno aparece no máximo uma vez por dia na fila
+  @@map("fila_diaria")
+}
+
+// ============================================================
+// LOGS DE IMPORTAÇÃO
+// ============================================================
+
+model LogImportacao {
+  id              String   @id @default(cuid())
+  nomeArquivo     String
+  totalLinhas     Int
+  importados      Int
+  duplicados      Int
+  erros           Int
+  detalhesErros   Json?    // [{ linha: number, cpf: string, erro: string }]
+  realizadaEm     DateTime @default(now())
+
+  @@map("logs_importacao")
+}

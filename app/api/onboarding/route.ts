@@ -100,9 +100,9 @@ export async function POST(req: NextRequest) {
     incluiAcessoEstrategia: aluno.incluiAcessoEstrategia,
   })
 
-  // Prazo: 2 dias úteis para verificação dos dados
+  // Prazo: 24 horas após o cadastro
   const prazoVerificacao = new Date(dataEntrada)
-  prazoVerificacao.setDate(prazoVerificacao.getDate() + 2)
+  prazoVerificacao.setHours(prazoVerificacao.getHours() + 24)
 
   // Tarefa principal de verificação
   const tarefaVerificacao = await prisma.tarefa.create({

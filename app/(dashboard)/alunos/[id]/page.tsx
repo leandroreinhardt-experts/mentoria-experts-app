@@ -8,7 +8,8 @@ import {
   ArrowLeft, Edit, CheckCircle, AlertTriangle, MessageCircle,
   Clock, Plus, Loader2, ExternalLink, Phone, Mail, Calendar,
   BookOpen, FileText, User, Activity, PhoneCall, BarChart2,
-  MessageSquare, GitBranch, CheckSquare, ShieldAlert,
+  MessageSquare, GitBranch, CheckSquare, ShieldAlert, Save, X,
+  GraduationCap, Target, Monitor,
 } from 'lucide-react'
 import { riscoConfig, calcularRiscoChurn, type NivelRisco } from '@/lib/churn-risk'
 import { TarefaModal, tarefaFormInicial, type TarefaFormData } from '@/components/shared/TarefaModal'
@@ -65,6 +66,9 @@ export default function AlunoPerfilPage() {
   const [aprovacaoForm, setAprovacaoForm] = useState({ concurso: '', dataAprovacao: '', observacao: '' })
   const [churnForm, setChurnForm] = useState({ motivo: 'RESCISAO_SOLICITADA', observacao: '' })
   const [tarefaForm, setTarefaForm] = useState<TarefaFormData>(tarefaFormInicial)
+  const [editingAreaEstudo, setEditingAreaEstudo] = useState(false)
+  const [areaEstudoInput, setAreaEstudoInput] = useState('')
+  const [savingAreaEstudo, setSavingAreaEstudo] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -282,22 +286,105 @@ export default function AlunoPerfilPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4 space-y-2">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Estudo</h3>
-            {aluno.cursoPrincipal && (
-              <div className="flex items-center gap-2 text-sm"><BookOpen size={14} className="text-gray-400" />{aluno.cursoPrincipal}</div>
-            )}
-            {aluno.areaEstudo && (
-              <div className="flex items-center gap-2 text-sm"><FileText size={14} className="text-gray-400" />{aluno.areaEstudo}</div>
-            )}
+          <CardContent className="p-4 space-y-2.5">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Dados do estudo</h3>
+
+            {/* Área de estudo — editável pela equipe */}
+            <div>
+              <p className="text-[10px] text-gray-400 mb-0.5">Área de estudo</p>
+              {editingAreaEstudo ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    autoFocus
+                    value={areaEstudoInput}
+                    onChange={(e) => setAreaEstudoInput(e.target.value)}
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Enter') {
+                        setSavingAreaEstudo(true)
+                        await fetch(`/api/alunos/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ areaEstudo: areaEstudoInput }) })
+                        setAluno((prev: any) => ({ ...prev, areaEstudo: areaEstudoInput }))
+                        setSavingAreaEstudo(false)
+                        setEditingAreaEstudo(false)
+                        toast({ title: 'Área de estudo atualizada!', variant: 'success' })
+                      }
+                      if (e.key === 'Escape') setEditingAreaEstudo(false)
+                    }}
+                    className="flex-1 rounded border border-indigo-300 px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-indigo-300"
+                    placeholder="Ex: Área Jurídica, Policial..."
+                  />
+                  <button onClick={async () => {
+                    setSavingAreaEstudo(true)
+                    await fetch(`/api/alunos/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ areaEstudo: areaEstudoInput }) })
+                    setAluno((prev: any) => ({ ...prev, areaEstudo: areaEstudoInput }))
+                    setSavingAreaEstudo(false)
+                    setEditingAreaEstudo(false)
+                    toast({ title: 'Área de estudo atualizada!', variant: 'success' })
+                  }} className="text-indigo-600 hover:text-indigo-800">
+                    {savingAreaEstudo ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                  </button>
+                  <button onClick={() => setEditingAreaEstudo(false)} className="text-gray-400 hover:text-gray-600"><X size={13} /></button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 group">
+                  <GraduationCap size={13} className="text-gray-400 shrink-0" />
+                  <span className="text-sm text-gray-800 flex-1">{aluno.areaEstudo || <span className="italic text-gray-300 text-xs">Não definida</span>}</span>
+                  <button onClick={() => { setAreaEstudoInput(aluno.areaEstudo || ''); setEditingAreaEstudo(true) }} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-indigo-500 transition-opacity">
+                    <Edit size={12} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Concurso */}
+            <div>
+              <p className="text-[10px] text-gray-400 mb-0.5">Concurso</p>
+              <div className="flex items-center gap-1.5 text-sm">
+                <Target size={13} className="text-gray-400 shrink-0" />
+                <span className="text-gray-800">
+                  {(() => {
+                    const resp = Array.isArray(aluno.onboardingRespostas)
+                      ? (aluno.onboardingRespostas as { pergunta: string; resposta: string }[]).find(r => r.pergunta === 'Qual concurso almejado?')?.resposta
+                      : null
+                    return resp || <span className="italic text-gray-300 text-xs">Não informado</span>
+                  })()}
+                </span>
+              </div>
+            </div>
+
+            {/* Curso */}
+            <div>
+              <p className="text-[10px] text-gray-400 mb-0.5">Curso</p>
+              <div className="flex items-center gap-1.5 text-sm">
+                <BookOpen size={13} className="text-gray-400 shrink-0" />
+                <span className="text-gray-800">{aluno.cursoPrincipal || <span className="italic text-gray-300 text-xs">Não informado</span>}</span>
+              </div>
+            </div>
+
+            {/* Plataforma de questões */}
+            <div>
+              <p className="text-[10px] text-gray-400 mb-0.5">Plataforma de questões</p>
+              <div className="flex items-center gap-1.5 text-sm">
+                <Monitor size={13} className="text-gray-400 shrink-0" />
+                <span className="text-gray-800">{aluno.plataformaQuestoes || <span className="italic text-gray-300 text-xs">Não informada</span>}</span>
+              </div>
+            </div>
+
+            {/* Último follow-up */}
+            <div>
+              <p className="text-[10px] text-gray-400 mb-0.5">Último follow-up</p>
+              <div className="flex items-center gap-1.5 text-sm">
+                <PhoneCall size={13} className={aluno.dataUltimoFollowUp && daysDiff(aluno.dataUltimoFollowUp) > 20 ? 'text-red-400' : 'text-gray-400'} />
+                <span className={aluno.dataUltimoFollowUp && daysDiff(aluno.dataUltimoFollowUp) > 20 ? 'text-red-600 font-medium' : 'text-gray-800'}>
+                  {aluno.dataUltimoFollowUp ? `${daysDiff(aluno.dataUltimoFollowUp)}d atrás` : <span className="italic text-gray-300 text-xs">Nunca realizado</span>}
+                </span>
+              </div>
+            </div>
+
             {aluno.linkTutory && (
-              <a href={aluno.linkTutory} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
-                <ExternalLink size={14} />Tutory
+              <a href={aluno.linkTutory} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline">
+                <ExternalLink size={12} />Abrir Tutory
               </a>
             )}
-            <div className="text-xs text-gray-500">
-              Últ. follow-up: {aluno.dataUltimoFollowUp ? `${daysDiff(aluno.dataUltimoFollowUp)}d atrás` : 'Nunca'}
-            </div>
           </CardContent>
         </Card>
         <Card className="border-indigo-100 bg-indigo-50/30">

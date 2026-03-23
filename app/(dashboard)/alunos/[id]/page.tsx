@@ -356,6 +356,9 @@ export default function AlunoPerfilPage() {
           <TabsTrigger value="analises">Análises ({aluno.analisesPlanos?.length || 0})</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
           <TabsTrigger value="comentarios">Comentários ({aluno.comentarios?.length || 0})</TabsTrigger>
+          {aluno.onboardingRespostas && Array.isArray(aluno.onboardingRespostas) && aluno.onboardingRespostas.length > 0 && (
+            <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+          )}
         </TabsList>
 
         {/* Tarefas */}
@@ -534,6 +537,21 @@ export default function AlunoPerfilPage() {
             </div>
           ))}
         </TabsContent>
+
+        {/* Onboarding */}
+        {aluno.onboardingRespostas && Array.isArray(aluno.onboardingRespostas) && aluno.onboardingRespostas.length > 0 && (
+          <TabsContent value="onboarding" className="space-y-3">
+            <p className="text-xs text-gray-400">Respostas preenchidas pelo aluno no formulário de onboarding.</p>
+            <div className="grid gap-3">
+              {(aluno.onboardingRespostas as { pergunta: string; resposta: string }[]).map((item, i) => (
+                <div key={i} className="bg-white border border-gray-100 rounded-lg px-4 py-3">
+                  <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1">{item.pergunta}</p>
+                  <p className="text-[13px] text-gray-800 whitespace-pre-wrap">{item.resposta}</p>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Zona de perigo */}

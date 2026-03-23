@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { Plano, StatusAluno, FaseMentoria } from '@prisma/client'
+import { Plano, StatusAluno, FaseMentoria, UrgenciaTarefa, StatusTarefa, TipoTarefa } from '@prisma/client'
 import { inicializarAluno } from '@/lib/aluno-utils'
 
 export async function POST(req: NextRequest) {
@@ -98,6 +98,45 @@ export async function POST(req: NextRequest) {
     faseAtual: aluno.faseAtual,
     faseManualOverride: aluno.faseManualOverride,
     incluiAcessoEstrategia: aluno.incluiAcessoEstrategia,
+  })
+
+  // Prazo: 2 dias úteis para verificação dos dados
+  const prazoVerificacao = new Date(dataEntrada)
+  prazoVerificacao.setDate(prazoVerificacao.getDate() + 2)
+
+  // Tarefa principal de verificação
+  const tarefaVerificacao = await prisma.tarefa.create({
+    data: {
+      titulo: `Verificar e completar dados — ${aluno.nome}`,
+      descricao: `Novo aluno cadastrado via formulário de onboarding. Revisar e completar as informações necessárias antes de iniciar o acompanhamento.`,
+      tipo: TipoTarefa.MANUAL,
+      alunoId: aluno.id,
+      urgencia: UrgenciaTarefa.ALTA,
+      status: StatusTarefa.A_FAZER,
+      prazo: prazoVerificacao,
+    },
+  })
+
+  // Subtarefas de verificação
+  const subtarefas = [
+    'Definir o plano do aluno (Start, Pro ou Elite)',
+    'Confirmar se o plano inclui assinatura do Estratégia Concursos',
+    `Confirmar curso base informado pelo aluno: "${cursoPrincipal || 'não informado'}"`,
+    `Confirmar plataforma de questões informada: "${plataformaQuestoes || 'não informada'}"`,
+    'Definir a data de vencimento (prazo) do plano do aluno',
+    'Verificar se o aluno está com acesso liberado na área do aluno',
+  ]
+
+  await prisma.tarefa.createMany({
+    data: subtarefas.map((titulo) => ({
+      titulo,
+      tipo: TipoTarefa.MANUAL,
+      alunoId: aluno.id,
+      urgencia: UrgenciaTarefa.ALTA,
+      status: StatusTarefa.A_FAZER,
+      prazo: prazoVerificacao,
+      parentId: tarefaVerificacao.id,
+    })),
   })
 
   return NextResponse.json({ id: aluno.id, nome: aluno.nome }, { status: 201 })

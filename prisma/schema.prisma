@@ -89,6 +89,7 @@ model MembroEquipe {
   analisesPlanosRealizadas AnalisePlano[]
   comentarios              Comentario[]
   sessoes                  Sessao[]
+  notificacoes             Notificacao[]
   mudancasFase             MudancaFase[]  @relation("MudancaFaseAutor")
   alunosResponsavel        Aluno[]        @relation("AlunoResponsavelAcomp")
 
@@ -333,4 +334,24 @@ model LogImportacao {
   realizadaEm     DateTime @default(now())
 
   @@map("logs_importacao")
+}
+
+// ============================================================
+// NOTIFICAÇÕES
+// ============================================================
+
+model Notificacao {
+  id        String   @id @default(cuid())
+  membroId  String
+  titulo    String
+  descricao String?
+  url       String?
+  lida      Boolean  @default(false)
+  criadoEm  DateTime @default(now())
+
+  membro MembroEquipe @relation(fields: [membroId], references: [id], onDelete: Cascade)
+
+  @@index([membroId, lida])
+  @@index([criadoEm])
+  @@map("notificacoes")
 }

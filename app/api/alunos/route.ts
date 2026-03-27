@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { inicializarAluno } from '@/lib/aluno-utils'
 import { calcularRiscoChurn } from '@/lib/churn-risk'
+import { notificarEquipe } from '@/lib/notificacoes'
 import { StatusTarefa } from '@prisma/client'
 
 export async function GET(req: NextRequest) {
@@ -17,6 +18,7 @@ export async function GET(req: NextRequest) {
   const fase = searchParams.get('fase') || ''
   const plano = searchParams.get('plano') || ''
   const status = searchParams.get('status') || ''
+  const excludeChurn = searchParams.get('excludeChurn') === 'true'
 
   const where: any = {}
   if (search) {
@@ -28,7 +30,11 @@ export async function GET(req: NextRequest) {
   }
   if (fase) where.faseAtual = fase
   if (plano) where.plano = plano
-  if (status) where.statusAtual = status
+  if (status) {
+    where.statusAtual = status
+  } else if (excludeChurn) {
+    where.statusAtual = { not: 'CHURN' }
+  }
 
   const now = new Date()
 
@@ -118,6 +124,14 @@ export async function POST(req: NextRequest) {
   })
 
   await inicializarAluno(aluno)
+
+  // Notificar todos os membros (exceto quem cadastrou)
+  await notificarEquipe({
+    titulo: `Novo aluno cadastrado: ${aluno.nome}`,
+    descricao: `Plano ${aluno.plano} · As tarefas de onboarding foram criadas automaticamente.`,
+    url: `/alunos/${aluno.id}`,
+    excluirMembroId: session.user.id,
+  })
 
   return NextResponse.json(aluno, { status: 201 })
 }

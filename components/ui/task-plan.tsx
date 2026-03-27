@@ -280,9 +280,16 @@ export function TaskPlan({ tarefas: initialTarefas, membros, onUpdate }: Props) 
                   )}
 
                   <div className="flex items-center gap-3 w-full min-w-0">
-                    <span className={`flex-1 text-sm font-medium truncate ${tarefa.status === "CONCLUIDA" ? "line-through text-gray-400" : "text-gray-800"}`}>
-                      {tarefa.titulo}
-                    </span>
+                    <div className="flex-1 min-w-0">
+                      <span className={`text-sm font-medium truncate block ${tarefa.status === "CONCLUIDA" ? "line-through text-gray-400" : "text-gray-800"}`}>
+                        {tarefa.titulo}
+                      </span>
+                      {tarefa.descricao && (
+                        <span className="text-[11px] text-gray-400 truncate block">
+                          {tarefa.descricao}
+                        </span>
+                      )}
+                    </div>
 
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {tarefa.subtarefas.length > 0 && (

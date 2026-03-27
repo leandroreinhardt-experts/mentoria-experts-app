@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
@@ -9,10 +9,11 @@ import {
   Clock, Plus, Loader2, ExternalLink, Phone, Mail, Calendar,
   BookOpen, FileText, User, Activity, PhoneCall, BarChart2,
   MessageSquare, GitBranch, CheckSquare, ShieldAlert, Save, X,
-  GraduationCap, Target, Monitor,
+  GraduationCap, Target, Monitor, Send, Copy, Check, Pencil,
 } from 'lucide-react'
 import { riscoConfig, calcularRiscoChurn, type NivelRisco } from '@/lib/churn-risk'
 import { TarefaModal, tarefaFormInicial, type TarefaFormData } from '@/components/shared/TarefaModal'
+import { EditarAlunoModal } from '@/components/shared/EditarAlunoModal'
 import { Button } from '@/components/ui/button'
 import { HoverBorderGradient } from '@/components/ui/hover-border-gradient'
 import { Input } from '@/components/ui/input'
@@ -49,6 +50,7 @@ export default function AlunoPerfilPage() {
   const [loading, setLoading] = useState(true)
 
   // Modais
+  const [editarModal, setEditarModal] = useState(false)
   const [followUpModal, setFollowUpModal] = useState(false)
   const [analiseModal, setAnaliseModal] = useState(false)
   const [tarefaModal, setTarefaModal] = useState(false)
@@ -58,17 +60,33 @@ export default function AlunoPerfilPage() {
   const [churnModal, setChurnModal] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  function copiar(valor: string, campo: string) {
+    navigator.clipboard.writeText(valor)
+    setCopiedField(campo)
+    setTimeout(() => setCopiedField(null), 1500)
+  }
 
   const [followUpObs, setFollowUpObs] = useState('')
   const [analiseObs, setAnaliseObs] = useState('')
+  const [analiseResponsavelId, setAnaliseResponsavelId] = useState('')
+  const [analiseData, setAnaliseData] = useState('')
   const [comentarioTexto, setComentarioTexto] = useState('')
   const [faseForm, setFaseForm] = useState({ faseNova: '', motivo: '' })
   const [aprovacaoForm, setAprovacaoForm] = useState({ concurso: '', dataAprovacao: '', observacao: '' })
   const [churnForm, setChurnForm] = useState({ motivo: 'RESCISAO_SOLICITADA', observacao: '' })
   const [tarefaForm, setTarefaForm] = useState<TarefaFormData>(tarefaFormInicial)
+  const [editTarefaModal, setEditTarefaModal] = useState(false)
+  const [editTarefaId, setEditTarefaId] = useState<string | null>(null)
+  const [editTarefaForm, setEditTarefaForm] = useState<TarefaFormData>(tarefaFormInicial)
   const [editingAreaEstudo, setEditingAreaEstudo] = useState(false)
   const [areaEstudoInput, setAreaEstudoInput] = useState('')
   const [savingAreaEstudo, setSavingAreaEstudo] = useState(false)
+  const [mencoes, setMencoes] = useState<string[]>([])
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [mentionCursorStart, setMentionCursorStart] = useState(0)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     Promise.all([
@@ -110,23 +128,67 @@ export default function AlunoPerfilPage() {
   }
 
   async function registrarAnalise() {
-    const data = await post(`/api/alunos/${id}/analises`, { observacao: analiseObs })
+    const body: any = { observacao: analiseObs }
+    if (analiseResponsavelId) body.responsavelId = analiseResponsavelId
+    if (analiseData) body.realizadaEm = analiseData
+    const data = await post(`/api/alunos/${id}/analises`, body)
     if (data) {
-      toast({ title: 'Análise registrada!', variant: 'success' })
+      toast({ title: 'Alteração registrada!', variant: 'success' })
       setAnaliseModal(false)
       setAnaliseObs('')
+      setAnaliseResponsavelId('')
+      setAnaliseData('')
       recarregar()
     }
   }
 
   async function adicionarComentario() {
     if (!comentarioTexto.trim()) return
-    const data = await post(`/api/alunos/${id}/comentarios`, { texto: comentarioTexto, mencoes: [] })
+    const data = await post(`/api/alunos/${id}/comentarios`, { texto: comentarioTexto, mencoes })
     if (data) {
-      setComentarioModal(false)
       setComentarioTexto('')
+      setMencoes([])
+      setMentionQuery(null)
       recarregar()
     }
+  }
+
+  function handleComentarioChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const text = e.target.value
+    setComentarioTexto(text)
+    const cursor = e.target.selectionStart ?? text.length
+    const beforeCursor = text.slice(0, cursor)
+    const match = beforeCursor.match(/@(\w*)$/)
+    if (match) {
+      setMentionQuery(match[1])
+      setMentionCursorStart(cursor - match[0].length)
+    } else {
+      setMentionQuery(null)
+    }
+  }
+
+  function selecionarMencao(membro: { id: string; nome: string }) {
+    const primeiroNome = membro.nome.split(' ')[0]
+    const cursor = textareaRef.current?.selectionStart ?? comentarioTexto.length
+    const before = comentarioTexto.slice(0, mentionCursorStart)
+    const after = comentarioTexto.slice(cursor)
+    const novoTexto = `${before}@${primeiroNome} ${after}`
+    setComentarioTexto(novoTexto)
+    setMencoes((prev) => (prev.includes(membro.id) ? prev : [...prev, membro.id]))
+    setMentionQuery(null)
+    setTimeout(() => {
+      const pos = mentionCursorStart + primeiroNome.length + 2
+      textareaRef.current?.setSelectionRange(pos, pos)
+      textareaRef.current?.focus()
+    }, 0)
+  }
+
+  function renderTextoComMencoes(texto: string) {
+    return texto.split(/(@\w+)/g).map((part, i) =>
+      part.startsWith('@')
+        ? <span key={i} className="text-indigo-600 font-medium">{part}</span>
+        : part
+    )
   }
 
   async function criarTarefa() {
@@ -139,6 +201,39 @@ export default function AlunoPerfilPage() {
       toast({ title: 'Tarefa criada!', variant: 'success' })
       setTarefaModal(false)
       setTarefaForm(tarefaFormInicial)
+      recarregar()
+    }
+  }
+
+  function abrirEditarTarefa(t: any) {
+    setEditTarefaId(t.id)
+    setEditTarefaForm({
+      titulo: t.titulo ?? '',
+      descricao: t.descricao ?? '',
+      responsavelId: t.responsavel?.id ?? '',
+      prazo: t.prazo ? new Date(t.prazo).toISOString().substring(0, 10) : '',
+      urgencia: t.urgencia ?? 'MEDIA',
+      alunoId: t.alunoId ?? id,
+    })
+    setEditTarefaModal(true)
+  }
+
+  async function salvarEdicaoTarefa() {
+    if (!editTarefaId || !editTarefaForm.titulo) {
+      toast({ title: 'Título obrigatório', variant: 'destructive' })
+      return
+    }
+    setSaving(true)
+    const res = await fetch(`/api/tarefas/${editTarefaId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editTarefaForm),
+    })
+    setSaving(false)
+    if (res.ok) {
+      toast({ title: 'Tarefa atualizada!', variant: 'success' })
+      setEditTarefaModal(false)
+      setEditTarefaId(null)
       recarregar()
     }
   }
@@ -204,6 +299,10 @@ export default function AlunoPerfilPage() {
   if (loading) return <div className="flex h-full items-center justify-center p-8 text-gray-500">Carregando...</div>
   if (!aluno || aluno.error) return <div className="p-8 text-red-500">Aluno não encontrado</div>
 
+  const membrosFiltrados = mentionQuery !== null
+    ? membros.filter((m: any) => m.nome.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 5)
+    : []
+
   const tarefasAbertas = aluno.tarefas?.filter((t: any) => t.status !== 'CONCLUIDA') || []
   const tarefasConcluidas = aluno.tarefas?.filter((t: any) => t.status === 'CONCLUIDA') || []
   const tarefasAtrasadas = tarefasAbertas.filter((t: any) => t.prazo && new Date(t.prazo) < new Date()).length
@@ -219,7 +318,12 @@ export default function AlunoPerfilPage() {
     : null
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6">
+      <div className="flex gap-6 items-start">
+
+        {/* ── LEFT COLUMN ─────────────────────────────────────── */}
+        <div className="flex-1 min-w-0 space-y-6">
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
@@ -244,11 +348,14 @@ export default function AlunoPerfilPage() {
             <p className="text-sm text-gray-500 mt-1">{statusLabels[aluno.statusAtual as StatusAluno]}</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" variant="outline" onClick={() => setEditarModal(true)}>
+            <Edit size={13} className="mr-1" />Editar dados
+          </Button>
           {aluno.statusAtual === StatusAluno.ATIVO && (
             <>
               <Button size="sm" onClick={() => setFollowUpModal(true)}>Registrar follow-up</Button>
-              <Button size="sm" variant="outline" onClick={() => setAnaliseModal(true)}>Análise do plano</Button>
+              <Button size="sm" variant="outline" onClick={() => setAnaliseModal(true)}>Alteração no plano</Button>
             </>
           )}
           <Button size="sm" variant="outline" onClick={() => setFaseModal(true)}>Alterar fase</Button>
@@ -262,17 +369,49 @@ export default function AlunoPerfilPage() {
       </div>
 
       {/* Info cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="p-4 space-y-2">
+          <CardContent className="p-4 space-y-2.5">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Contato</h3>
             {aluno.email && (
-              <div className="flex items-center gap-2 text-sm"><Mail size={14} className="text-gray-400" />{aluno.email}</div>
+              <div className="group flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2 text-sm min-w-0">
+                  <Mail size={14} className="text-gray-400 shrink-0 mt-0.5" />
+                  <span className="break-all text-gray-800">{aluno.email}</span>
+                </div>
+                <button onClick={() => copiar(aluno.email, 'email')} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-indigo-600" title="Copiar e-mail">
+                  {copiedField === 'email' ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
+                </button>
+              </div>
             )}
             {aluno.whatsapp && (
-              <div className="flex items-center gap-2 text-sm"><Phone size={14} className="text-gray-400" />{aluno.whatsapp}</div>
+              <div className="group flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Phone size={14} className="text-gray-400 shrink-0" />
+                  <span className="text-gray-800">{aluno.whatsapp}</span>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <a
+                    href={`https://api.whatsapp.com/send?phone=${aluno.whatsapp.replace(/\D/g, '').replace(/^(?!55)/, '55')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-500 hover:text-green-700 transition-colors"
+                    title="Abrir no WhatsApp"
+                  >
+                    <MessageCircle size={14} />
+                  </a>
+                  <button onClick={() => copiar(aluno.whatsapp!, 'whatsapp')} className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-indigo-600" title="Copiar WhatsApp">
+                    {copiedField === 'whatsapp' ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
+                  </button>
+                </div>
+              </div>
             )}
-            <div className="flex items-center gap-2 text-sm text-gray-500">CPF: {aluno.cpf}</div>
+            <div className="group flex items-center justify-between gap-2">
+              <span className="text-sm text-gray-500">CPF: {aluno.cpf}</span>
+              <button onClick={() => copiar(aluno.cpf, 'cpf')} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-indigo-600" title="Copiar CPF">
+                {copiedField === 'cpf' ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
+              </button>
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -343,9 +482,11 @@ export default function AlunoPerfilPage() {
                 <span className="text-gray-800">
                   {(() => {
                     const resp = Array.isArray(aluno.onboardingRespostas)
-                      ? (aluno.onboardingRespostas as { pergunta: string; resposta: string }[]).find(r => r.pergunta === 'Qual concurso almejado?')?.resposta
+                      ? (aluno.onboardingRespostas as { pergunta: string; resposta: string }[]).find(
+                          r => r.pergunta === 'Qual concurso almejado?' || r.pergunta === 'Concurso / Cargo'
+                        )?.resposta
                       : null
-                    return resp || <span className="italic text-gray-300 text-xs">Não informado</span>
+                    return resp || aluno.areaEstudo || <span className="italic text-gray-300 text-xs">Não informado</span>
                   })()}
                 </span>
               </div>
@@ -434,24 +575,11 @@ export default function AlunoPerfilPage() {
         </Card>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="tarefas">
-        <TabsList>
-          <TabsTrigger value="tarefas">Tarefas ({tarefasAbertas.length})</TabsTrigger>
-          <TabsTrigger value="comunicacoes">Comunicações ({comunicacoes.length})</TabsTrigger>
-          <TabsTrigger value="followups">Follow-ups ({aluno.followUps?.length || 0})</TabsTrigger>
-          <TabsTrigger value="analises">Análises ({aluno.analisesPlanos?.length || 0})</TabsTrigger>
-          <TabsTrigger value="historico">Histórico</TabsTrigger>
-          <TabsTrigger value="comentarios">Comentários ({aluno.comentarios?.length || 0})</TabsTrigger>
-          {aluno.onboardingRespostas && Array.isArray(aluno.onboardingRespostas) && aluno.onboardingRespostas.length > 0 && (
-            <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
-          )}
-        </TabsList>
-
-        {/* Tarefas */}
-        <TabsContent value="tarefas" className="space-y-4">
+      {/* Tarefas */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
           <div className="flex justify-between items-center">
-            <h3 className="font-semibold text-gray-700">Tarefas do aluno</h3>
+            <h3 className="font-semibold text-gray-700">Tarefas ({tarefasAbertas.length})</h3>
             <HoverBorderGradient as="button" onClick={() => setTarefaModal(true)} containerClassName="rounded-lg" className="text-xs font-medium h-8 px-3">
               <Plus size={13} /> Nova tarefa
             </HoverBorderGradient>
@@ -459,8 +587,8 @@ export default function AlunoPerfilPage() {
           {tarefasAbertas.length === 0 && <p className="text-sm text-gray-500">Nenhuma tarefa aberta.</p>}
           <div className="space-y-2">
             {tarefasAbertas.map((t: any) => (
-              <div key={t.id} className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
-                <div className="flex-1">
+              <div key={t.id} className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm text-gray-900">{t.titulo}</p>
                   {t.descricao && <p className="text-xs text-gray-500">{t.descricao}</p>}
                   <div className="flex items-center gap-3 mt-1">
@@ -469,24 +597,30 @@ export default function AlunoPerfilPage() {
                     {t.responsavel && <span className="text-xs text-gray-500">{t.responsavel.nome}</span>}
                   </div>
                 </div>
-                <Select
-                  value={t.status}
-                  onValueChange={(v) => alterarStatusTarefa(t.id, v as StatusTarefa)}
-                >
-                  <SelectTrigger className="w-36 h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="A_FAZER">A fazer</SelectItem>
-                    <SelectItem value="EM_ANDAMENTO">Em andamento</SelectItem>
-                    <SelectItem value="CONCLUIDA">Concluída</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => abrirEditarTarefa(t)}
+                    className="text-gray-400 hover:text-indigo-600 transition-colors"
+                    title="Editar tarefa"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <Select value={t.status} onValueChange={(v) => alterarStatusTarefa(t.id, v as StatusTarefa)}>
+                    <SelectTrigger className="w-36 h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="A_FAZER">A fazer</SelectItem>
+                      <SelectItem value="EM_ANDAMENTO">Em andamento</SelectItem>
+                      <SelectItem value="CONCLUIDA">Concluída</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             ))}
           </div>
           {tarefasConcluidas.length > 0 && (
-            <details className="mt-4">
+            <details>
               <summary className="text-sm text-gray-500 cursor-pointer">Tarefas concluídas ({tarefasConcluidas.length})</summary>
               <div className="space-y-2 mt-2">
                 {tarefasConcluidas.map((t: any) => (
@@ -499,57 +633,20 @@ export default function AlunoPerfilPage() {
               </div>
             </details>
           )}
-        </TabsContent>
+        </CardContent>
+      </Card>
 
-        {/* Comunicações */}
-        <TabsContent value="comunicacoes" className="space-y-2">
-          {comunicacoes.length === 0 ? (
-            <p className="text-sm text-gray-500 py-4">Nenhuma comunicação registrada.</p>
-          ) : (
-            <div className="relative">
-              {/* Linha vertical da timeline */}
-              <div className="absolute left-[19px] top-0 bottom-0 w-0.5 bg-gray-100" />
-              <div className="space-y-3">
-                {comunicacoes.map((ev: any) => {
-                  const iconMap: Record<string, { icon: React.ReactNode; cor: string }> = {
-                    FOLLOWUP:         { icon: <PhoneCall size={13} />,   cor: 'bg-blue-500' },
-                    ANALISE:          { icon: <BarChart2 size={13} />,   cor: 'bg-purple-500' },
-                    COMENTARIO:       { icon: <MessageSquare size={13} />, cor: 'bg-gray-500' },
-                    FASE:             { icon: <GitBranch size={13} />,   cor: 'bg-orange-500' },
-                    TAREFA_CONCLUIDA: { icon: <CheckSquare size={13} />, cor: 'bg-emerald-500' },
-                  }
-                  const { icon, cor } = iconMap[ev.tipo] ?? { icon: <Activity size={13} />, cor: 'bg-gray-400' }
-                  return (
-                    <div key={ev.id} className="flex gap-4 relative">
-                      <div className={`w-10 h-10 rounded-full ${cor} text-white flex items-center justify-center shrink-0 z-10 shadow-sm`}>
-                        {icon}
-                      </div>
-                      <div className="flex-1 bg-white border border-gray-100 rounded-xl p-3 pb-2 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <p className="text-sm font-semibold text-gray-900">{ev.titulo}</p>
-                          <span className="text-[11px] text-gray-400 shrink-0">
-                            {formatDateTime(ev.data)}
-                          </span>
-                        </div>
-                        {ev.descricao && (
-                          <p className="text-sm text-gray-600 leading-relaxed">{ev.descricao}</p>
-                        )}
-                        {ev.responsavel && (
-                          <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-50">
-                            <div className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 text-[9px] flex items-center justify-center font-bold">
-                              {ev.responsavel.nome?.[0]}
-                            </div>
-                            <span className="text-[11px] text-gray-500">{ev.responsavel.nome}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+      {/* Tabs: Follow-ups, Análises, Histórico, Comunicações, Onboarding */}
+      <Tabs defaultValue="followups">
+        <TabsList>
+          <TabsTrigger value="followups">Follow-ups ({aluno.followUps?.length || 0})</TabsTrigger>
+          <TabsTrigger value="analises">Alterações no plano ({aluno.analisesPlanos?.length || 0})</TabsTrigger>
+          <TabsTrigger value="historico">Histórico</TabsTrigger>
+          <TabsTrigger value="comunicacoes">Comunicações ({comunicacoes.length})</TabsTrigger>
+          {aluno.onboardingRespostas && Array.isArray(aluno.onboardingRespostas) && aluno.onboardingRespostas.length > 0 && (
+            <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
           )}
-        </TabsContent>
+        </TabsList>
 
         {/* Follow-ups */}
         <TabsContent value="followups" className="space-y-3">
@@ -569,10 +666,10 @@ export default function AlunoPerfilPage() {
 
         {/* Análises */}
         <TabsContent value="analises" className="space-y-3">
-          {(!aluno.analisesPlansos || aluno.analisesPlansos.length === 0) && (
-            <p className="text-sm text-gray-500">Nenhuma análise registrada.</p>
+          {(!aluno.analisesPlanos || aluno.analisesPlanos.length === 0) && (
+            <p className="text-sm text-gray-500">Nenhuma alteração registrada.</p>
           )}
-          {aluno.analisesPlansos?.map((a: any) => (
+          {aluno.analisesPlanos?.map((a: any) => (
             <div key={a.id} className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm font-medium text-gray-900">{a.responsavel?.nome}</span>
@@ -585,6 +682,9 @@ export default function AlunoPerfilPage() {
 
         {/* Histórico */}
         <TabsContent value="historico" className="space-y-2">
+          {(!aluno.mudancasFase || aluno.mudancasFase.length === 0) && (
+            <p className="text-sm text-gray-500">Nenhuma mudança registrada.</p>
+          )}
           {aluno.mudancasFase?.map((m: any) => (
             <div key={m.id} className="flex items-start gap-3 bg-white border border-gray-200 rounded-lg p-3">
               <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
@@ -601,28 +701,49 @@ export default function AlunoPerfilPage() {
           ))}
         </TabsContent>
 
-        {/* Comentários */}
-        <TabsContent value="comentarios" className="space-y-3">
-          <div className="flex justify-end">
-            <Button size="sm" onClick={() => setComentarioModal(true)}>
-              <MessageCircle size={16} className="mr-1" /> Comentar
-            </Button>
-          </div>
-          {(!aluno.comentarios || aluno.comentarios.length === 0) && (
-            <p className="text-sm text-gray-500">Nenhum comentário ainda.</p>
-          )}
-          {aluno.comentarios?.map((c: any) => (
-            <div key={c.id} className="bg-white border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs flex items-center justify-center font-semibold">
-                  {c.autor?.nome?.[0]}
-                </div>
-                <span className="text-sm font-medium">{c.autor?.nome}</span>
-                <span className="text-xs text-gray-400 ml-auto">{formatDateTime(c.criadoEm)}</span>
+        {/* Comunicações */}
+        <TabsContent value="comunicacoes" className="space-y-2">
+          {comunicacoes.length === 0 ? (
+            <p className="text-sm text-gray-500 py-4">Nenhuma comunicação registrada.</p>
+          ) : (
+            <div className="relative">
+              <div className="absolute left-[19px] top-0 bottom-0 w-0.5 bg-gray-100" />
+              <div className="space-y-3">
+                {comunicacoes.map((ev: any) => {
+                  const iconMap: Record<string, { icon: React.ReactNode; cor: string }> = {
+                    FOLLOWUP:         { icon: <PhoneCall size={13} />,    cor: 'bg-blue-500' },
+                    ANALISE:          { icon: <BarChart2 size={13} />,    cor: 'bg-purple-500' },
+                    COMENTARIO:       { icon: <MessageSquare size={13} />, cor: 'bg-gray-500' },
+                    FASE:             { icon: <GitBranch size={13} />,    cor: 'bg-orange-500' },
+                    TAREFA_CONCLUIDA: { icon: <CheckSquare size={13} />,  cor: 'bg-emerald-500' },
+                  }
+                  const { icon, cor } = iconMap[ev.tipo] ?? { icon: <Activity size={13} />, cor: 'bg-gray-400' }
+                  return (
+                    <div key={ev.id} className="flex gap-4 relative">
+                      <div className={`w-10 h-10 rounded-full ${cor} text-white flex items-center justify-center shrink-0 z-10 shadow-sm`}>
+                        {icon}
+                      </div>
+                      <div className="flex-1 bg-white border border-gray-100 rounded-xl p-3 pb-2 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="text-sm font-semibold text-gray-900">{ev.titulo}</p>
+                          <span className="text-[11px] text-gray-400 shrink-0">{formatDateTime(ev.data)}</span>
+                        </div>
+                        {ev.descricao && <p className="text-sm text-gray-600 leading-relaxed">{ev.descricao}</p>}
+                        {ev.responsavel && (
+                          <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-50">
+                            <div className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 text-[9px] flex items-center justify-center font-bold">
+                              {ev.responsavel.nome?.[0]}
+                            </div>
+                            <span className="text-[11px] text-gray-500">{ev.responsavel.nome}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-              <p className="text-sm text-gray-700">{c.texto}</p>
             </div>
-          ))}
+          )}
         </TabsContent>
 
         {/* Onboarding */}
@@ -654,7 +775,103 @@ export default function AlunoPerfilPage() {
         </CardContent>
       </Card>
 
+        </div>{/* end left column */}
+
+        {/* ── RIGHT COLUMN — Chat da equipe ─────────────────────── */}
+        <div className="w-80 xl:w-96 shrink-0 sticky top-6 self-start">
+          <Card className="flex flex-col">
+            <CardHeader className="pb-3 border-b">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <MessageCircle size={15} className="text-indigo-500" />
+                Chat da equipe
+                {aluno.comentarios?.length > 0 && (
+                  <span className="ml-auto text-xs font-normal text-gray-400">{aluno.comentarios.length} mensagem{aluno.comentarios.length !== 1 ? 's' : ''}</span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 flex flex-col gap-3">
+              {/* Messages */}
+              <div className="flex flex-col gap-2 max-h-[420px] overflow-y-auto pr-1">
+                {(!aluno.comentarios || aluno.comentarios.length === 0) && (
+                  <p className="text-xs text-gray-400 italic text-center py-6">Nenhuma mensagem ainda.</p>
+                )}
+                {aluno.comentarios?.map((c: any) => (
+                  <div key={c.id} className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[9px] flex items-center justify-center font-bold shrink-0">
+                        {c.autor?.nome?.[0]}
+                      </div>
+                      <span className="text-[11px] font-medium text-gray-700">{c.autor?.nome}</span>
+                      <span className="text-[10px] text-gray-400 ml-auto">{formatDateTime(c.criadoEm)}</span>
+                    </div>
+                    <div className="ml-6 bg-gray-50 border border-gray-100 rounded-xl rounded-tl-none px-3 py-2">
+                      <p className="text-[13px] text-gray-800 whitespace-pre-wrap">{renderTextoComMencoes(c.texto)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Input */}
+              <div className="flex gap-2 items-end border-t pt-3 relative">
+                {/* @mention dropdown */}
+                {mentionQuery !== null && membrosFiltrados.length > 0 && (
+                  <div className="absolute bottom-full left-0 right-10 mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
+                    {membrosFiltrados.map((m: any) => (
+                      <button
+                        key={m.id}
+                        onMouseDown={(e) => { e.preventDefault(); selecionarMencao(m) }}
+                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-indigo-50 text-left transition-colors"
+                      >
+                        <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-[9px] flex items-center justify-center font-bold shrink-0">
+                          {m.nome[0]}
+                        </div>
+                        <span className="text-sm text-gray-800">{m.nome}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <Textarea
+                  ref={textareaRef}
+                  value={comentarioTexto}
+                  onChange={handleComentarioChange}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') { setMentionQuery(null); return }
+                    if (mentionQuery !== null && membrosFiltrados.length > 0 && (e.key === 'Enter' || e.key === 'Tab')) {
+                      e.preventDefault()
+                      selecionarMencao(membrosFiltrados[0])
+                      return
+                    }
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      adicionarComentario()
+                    }
+                  }}
+                  placeholder="Escreva um comentário... (use @ para mencionar)"
+                  rows={2}
+                  className="text-sm resize-none flex-1"
+                />
+                <Button
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  disabled={saving || !comentarioTexto.trim()}
+                  onClick={adicionarComentario}
+                >
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+      </div>{/* end flex row */}
+
       {/* MODAIS */}
+      <EditarAlunoModal
+        aluno={aluno}
+        open={editarModal}
+        onClose={() => setEditarModal(false)}
+        onSaved={(atualizado) => setAluno((prev: any) => ({ ...prev, ...atualizado }))}
+      />
+
       <Dialog open={followUpModal} onOpenChange={setFollowUpModal}>
         <DialogContent>
           <DialogHeader><DialogTitle>Registrar follow-up</DialogTitle></DialogHeader>
@@ -674,13 +891,40 @@ export default function AlunoPerfilPage() {
 
       <Dialog open={analiseModal} onOpenChange={setAnaliseModal}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Análise do plano de estudos</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <Label>Observação</Label>
-            <Textarea value={analiseObs} onChange={(e) => setAnaliseObs(e.target.value)} placeholder="Resultado da análise..." rows={4} />
+          <DialogHeader><DialogTitle>Alteração no plano de estudos</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Responsável</Label>
+                <Select value={analiseResponsavelId || '__session__'} onValueChange={(v) => setAnaliseResponsavelId(v === '__session__' ? '' : v)}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Selecionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__session__">Eu mesmo</SelectItem>
+                    {membros.map((m: any) => (
+                      <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Data</Label>
+                <Input
+                  type="date"
+                  value={analiseData}
+                  onChange={(e) => setAnaliseData(e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Observação</Label>
+              <Textarea value={analiseObs} onChange={(e) => setAnaliseObs(e.target.value)} placeholder="Descreva a alteração realizada no plano..." rows={4} />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAnaliseModal(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setAnaliseModal(false); setAnaliseObs(''); setAnaliseResponsavelId(''); setAnaliseData('') }}>Cancelar</Button>
             <Button onClick={registrarAnalise} disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Registrar
@@ -700,18 +944,20 @@ export default function AlunoPerfilPage() {
         alunoFixo={aluno ? { id: aluno.id, nome: aluno.nome } : undefined}
       />
 
-      <Dialog open={comentarioModal} onOpenChange={setComentarioModal}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Adicionar comentário</DialogTitle></DialogHeader>
-          <Textarea value={comentarioTexto} onChange={(e) => setComentarioTexto(e.target.value)} placeholder="Escreva um comentário..." rows={4} />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setComentarioModal(false)}>Cancelar</Button>
-            <Button onClick={adicionarComentario} disabled={saving || !comentarioTexto.trim()}>Enviar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TarefaModal
+        open={editTarefaModal}
+        onOpenChange={setEditTarefaModal}
+        form={editTarefaForm}
+        setForm={setEditTarefaForm}
+        onSubmit={salvarEdicaoTarefa}
+        saving={saving}
+        membros={membros}
+        alunoFixo={aluno ? { id: aluno.id, nome: aluno.nome } : undefined}
+        titulo="Editar tarefa"
+        labelSubmit="Salvar"
+      />
 
-      <Dialog open={faseModal} onOpenChange={setFaseModal}>
+<Dialog open={faseModal} onOpenChange={setFaseModal}>
         <DialogContent>
           <DialogHeader><DialogTitle>Alterar fase manualmente</DialogTitle></DialogHeader>
           <div className="space-y-3">

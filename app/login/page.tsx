@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { GraduationCap, Loader2 } from 'lucide-react'
+import Image from 'next/image'
+import { Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tiles } from '@/components/ui/tiles'
@@ -45,9 +46,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-violet-900/40 via-transparent to-indigo-900/30 pointer-events-none" />
 
         <div className="relative z-10 flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg">
-            <GraduationCap className="h-5 w-5 text-white" />
-          </div>
+          <Image src="/logo.png" alt="Mentoria Experts" width={36} height={36} className="rounded-xl shadow-lg" />
           <span className="text-white font-semibold text-[15px]">Mentoria Experts</span>
         </div>
 
@@ -76,9 +75,7 @@ export default function LoginPage() {
         </div>
         <div className="w-full max-w-sm">
           <div className="mb-8 lg:hidden flex items-center gap-2 justify-center">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600">
-              <GraduationCap className="h-5 w-5 text-white" />
-            </div>
+            <Image src="/logo.png" alt="Mentoria Experts" width={36} height={36} className="rounded-xl" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-1">Boas-vindas de volta</h1>
           <p className="text-sm text-gray-400 mb-8">Entre com suas credenciais para continuar</p>

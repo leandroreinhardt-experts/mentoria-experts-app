@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Bell, AlertTriangle, Clock, CheckSquare, UserX, X } from 'lucide-react'
+import { Bell, AlertTriangle, Clock, CheckSquare, UserX, X, AtSign, UserPlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import * as Popover from '@radix-ui/react-popover'
 
@@ -37,11 +37,29 @@ interface TarefaAtrasada {
   aluno: { id: string; nome: string } | null
 }
 
+interface Mencao {
+  id: string
+  texto: string
+  criadoEm: string
+  aluno: { id: string; nome: string } | null
+  autor: { nome: string } | null
+}
+
+interface NotificacaoSalva {
+  id: string
+  titulo: string
+  descricao: string | null
+  url: string | null
+  criadoEm: string
+}
+
 interface NotificacoesData {
   criticos: AlunoRisco[]
   followUpsAtrasados: FollowUpAtrasado[]
   vencendoEm7Dias: Vencimento[]
   tarefasAtrasadas: TarefaAtrasada[]
+  mencoesPendentes: Mencao[]
+  notificacoesNaoLidas: NotificacaoSalva[]
   total: number
 }
 
@@ -83,6 +101,7 @@ export function NotificationBell() {
   const [data, setData] = useState<NotificacoesData | null>(null)
   const [open, setOpen] = useState(false)
   const [unread, setUnread] = useState(0)
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   async function fetchNotificacoes() {
@@ -92,11 +111,24 @@ export function NotificationBell() {
       const json: NotificacoesData = await res.json()
       setData(json)
 
-      // Calcular não lidas com base no timestamp de última visualização
+      // Notificações salvas não lidas sempre aparecem no badge
+      const naoLidas = json.notificacoesNaoLidas?.length ?? 0
       const lastSeen = parseInt(localStorage.getItem(LAST_SEEN_KEY) ?? '0', 10)
       const elapsed = Date.now() - lastSeen
-      // Se passaram mais de 5 minutos desde que abriu, mostra o total como não lido
-      setUnread(elapsed > 5 * 60 * 1000 ? json.total : 0)
+      setUnread(naoLidas + (elapsed > 5 * 60 * 1000 ? (json.total - naoLidas) : 0))
+    } catch {
+      // silencioso
+    }
+  }
+
+  async function marcarNotificacoesLidas(ids: string[]) {
+    if (ids.length === 0) return
+    try {
+      await fetch('/api/notificacoes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      })
     } catch {
       // silencioso
     }
@@ -110,15 +142,43 @@ export function NotificationBell() {
     }
   }, [])
 
+  function handleDismiss(key: string, dbId?: string) {
+    setDismissed((prev) => new Set([...prev, key]))
+    if (dbId) marcarNotificacoesLidas([dbId])
+  }
+
   function handleOpen(next: boolean) {
     setOpen(next)
     if (next) {
+      // Abriu: zera badge e marca como lidas em background — mantém visíveis no painel
       localStorage.setItem(LAST_SEEN_KEY, String(Date.now()))
       setUnread(0)
+      const ids = data?.notificacoesNaoLidas?.map((n) => n.id) ?? []
+      marcarNotificacoesLidas(ids)
+    } else {
+      // Fechou: limpa dismissed e remove notificações salvas do estado local
+      setDismissed(new Set())
+      if (data && (data.notificacoesNaoLidas?.length ?? 0) > 0) {
+        setData({ ...data, notificacoesNaoLidas: [] })
+      }
     }
   }
 
-  const total = data?.total ?? 0
+  // Filtered lists (excluding dismissed items)
+  const naoLidasVisiveis    = (data?.notificacoesNaoLidas ?? []).filter((n) => !dismissed.has(`notif_${n.id}`))
+  const mencoesVisiveis     = (data?.mencoesPendentes ?? []).filter((m) => !dismissed.has(`mencao_${m.id}`))
+  const criticosVisiveis    = (data?.criticos ?? []).filter((a) => !dismissed.has(`critico_${a.id}`))
+  const followUpsVisiveis   = (data?.followUpsAtrasados ?? []).filter((a) => !dismissed.has(`followup_${a.id}`))
+  const vencimentosVisiveis = (data?.vencendoEm7Dias ?? []).filter((a) => !dismissed.has(`vencimento_${a.id}`))
+  const tarefasVisiveis     = (data?.tarefasAtrasadas ?? []).filter((t) => !dismissed.has(`tarefa_${t.id}`))
+
+  const total =
+    naoLidasVisiveis.length +
+    mencoesVisiveis.length +
+    criticosVisiveis.length +
+    followUpsVisiveis.length +
+    vencimentosVisiveis.length +
+    tarefasVisiveis.length
 
   return (
     <Popover.Root open={open} onOpenChange={handleOpen}>
@@ -168,20 +228,82 @@ export function NotificationBell() {
               </div>
             ) : (
               <>
+                {/* Novos alunos */}
+                {naoLidasVisiveis.length > 0 && (
+                  <div>
+                    <Section
+                      icon={<UserPlus size={10} />}
+                      label="Novos alunos"
+                      count={naoLidasVisiveis.length}
+                      color="text-emerald-700 bg-emerald-50"
+                    />
+                    {naoLidasVisiveis.map((n) => (
+                      <Link
+                        key={n.id}
+                        href={n.url ?? '#'}
+                        onClick={() => { handleDismiss(`notif_${n.id}`, n.id); setOpen(false) }}
+                        className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                          <UserPlus size={11} className="text-emerald-600" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12px] font-medium text-gray-800">{n.titulo}</p>
+                          {n.descricao && (
+                            <p className="truncate text-[10px] text-gray-400">{n.descricao}</p>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+
+                {/* Menções */}
+                {mencoesVisiveis.length > 0 && (
+                  <div>
+                    <Section
+                      icon={<AtSign size={10} />}
+                      label="Você foi mencionado"
+                      count={mencoesVisiveis.length}
+                      color="text-violet-600 bg-violet-50"
+                    />
+                    {mencoesVisiveis.map((m) => (
+                      <Link
+                        key={m.id}
+                        href={m.aluno ? `/alunos/${m.aluno.id}` : '#'}
+                        onClick={() => { handleDismiss(`mencao_${m.id}`, m.id); setOpen(false) }}
+                        className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-violet-100">
+                          <AtSign size={11} className="text-violet-500" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12px] font-medium text-gray-800">
+                            {m.autor?.nome} mencionou você
+                          </p>
+                          <p className="truncate text-[10px] text-gray-400">
+                            {m.aluno?.nome} · {m.texto.slice(0, 40)}{m.texto.length > 40 ? '…' : ''}
+                          </p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+
                 {/* Risco crítico */}
-                {(data?.criticos?.length ?? 0) > 0 && (
+                {criticosVisiveis.length > 0 && (
                   <div>
                     <Section
                       icon={<AlertTriangle size={10} />}
                       label="Risco crítico"
-                      count={data!.criticos.length}
+                      count={criticosVisiveis.length}
                       color="text-red-500 bg-red-50"
                     />
-                    {data!.criticos.map((a) => (
+                    {criticosVisiveis.map((a) => (
                       <Link
                         key={a.id}
                         href={`/alunos/${a.id}`}
-                        onClick={() => setOpen(false)}
+                        onClick={() => { handleDismiss(`critico_${a.id}`); setOpen(false) }}
                         className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 transition-colors"
                       >
                         <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-red-100">
@@ -197,19 +319,19 @@ export function NotificationBell() {
                 )}
 
                 {/* Follow-ups atrasados */}
-                {(data?.followUpsAtrasados?.length ?? 0) > 0 && (
+                {followUpsVisiveis.length > 0 && (
                   <div>
                     <Section
                       icon={<Clock size={10} />}
                       label="Follow-ups atrasados"
-                      count={data!.followUpsAtrasados.length}
+                      count={followUpsVisiveis.length}
                       color="text-amber-600 bg-amber-50"
                     />
-                    {data!.followUpsAtrasados.map((a) => (
+                    {followUpsVisiveis.map((a) => (
                       <Link
                         key={a.id}
                         href={`/alunos/${a.id}`}
-                        onClick={() => setOpen(false)}
+                        onClick={() => { handleDismiss(`followup_${a.id}`); setOpen(false) }}
                         className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 transition-colors"
                       >
                         <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-amber-100">
@@ -227,19 +349,19 @@ export function NotificationBell() {
                 )}
 
                 {/* Vencimentos em 7 dias */}
-                {(data?.vencendoEm7Dias?.length ?? 0) > 0 && (
+                {vencimentosVisiveis.length > 0 && (
                   <div>
                     <Section
                       icon={<AlertTriangle size={10} />}
                       label="Vencendo em breve"
-                      count={data!.vencendoEm7Dias.length}
+                      count={vencimentosVisiveis.length}
                       color="text-orange-500 bg-orange-50"
                     />
-                    {data!.vencendoEm7Dias.map((a) => (
+                    {vencimentosVisiveis.map((a) => (
                       <Link
                         key={a.id}
                         href={`/alunos/${a.id}`}
-                        onClick={() => setOpen(false)}
+                        onClick={() => { handleDismiss(`vencimento_${a.id}`); setOpen(false) }}
                         className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 transition-colors"
                       >
                         <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-orange-100">
@@ -257,19 +379,19 @@ export function NotificationBell() {
                 )}
 
                 {/* Tarefas atrasadas */}
-                {(data?.tarefasAtrasadas?.length ?? 0) > 0 && (
+                {tarefasVisiveis.length > 0 && (
                   <div>
                     <Section
                       icon={<CheckSquare size={10} />}
                       label="Tarefas atrasadas"
-                      count={data!.tarefasAtrasadas.length}
+                      count={tarefasVisiveis.length}
                       color="text-indigo-500 bg-indigo-50"
                     />
-                    {data!.tarefasAtrasadas.map((t) => (
+                    {tarefasVisiveis.map((t) => (
                       <Link
                         key={t.id}
                         href="/tarefas/lista"
-                        onClick={() => setOpen(false)}
+                        onClick={() => { handleDismiss(`tarefa_${t.id}`); setOpen(false) }}
                         className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 transition-colors"
                       >
                         <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100">

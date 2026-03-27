@@ -21,20 +21,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const body = await req.json()
-  const now = new Date()
+  const realizadaEm = body.realizadaEm ? new Date(body.realizadaEm) : new Date()
+  const responsavelId = body.responsavelId || session.user.id
 
   const analise = await prisma.analisePlano.create({
     data: {
       alunoId: params.id,
-      responsavelId: session.user.id,
+      responsavelId,
       observacao: body.observacao,
-      realizadaEm: now,
+      realizadaEm,
     },
   })
 
   await prisma.aluno.update({
     where: { id: params.id },
-    data: { dataUltimaAnalisePlano: now },
+    data: { dataUltimaAnalisePlano: realizadaEm },
   })
 
   return NextResponse.json(analise, { status: 201 })

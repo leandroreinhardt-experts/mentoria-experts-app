@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { GraduationCap, CheckCircle2, ChevronDown, AlertCircle } from 'lucide-react'
+import Image from 'next/image'
+import { CheckCircle2, ChevronDown, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ── Dados dos dropdowns ────────────────────────────────────────────────────
@@ -33,6 +34,15 @@ const TEMPO_ESTUDANDO = [
 ]
 
 const DIAS_SEMANA = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
+
+const PLANOS_CONTRATADOS = [
+  'Start - Semestral',
+  'Start - Anual',
+  'Pro - Semestral',
+  'Pro - Anual',
+  'Elite - Semestral',
+  'Elite - Anual',
+]
 
 // ── Componentes auxiliares ─────────────────────────────────────────────────
 function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
@@ -227,6 +237,7 @@ function FieldError({ msg }: { msg?: string }) {
 // ── Formulário principal ───────────────────────────────────────────────────
 type FormData = {
   nome: string; cpf: string; email: string; whatsapp: string; cidadeEstado: string
+  planoContratado: string
   dataInicial: string; possuiFilhos: string; nivelEscolaridade: string
   areaFormacao: string; situacaoProfissional: string; cargoAtual: string
   concursoAlmejado: string; cargoAlmejado: string; dataProva: string; cursoPrincipal: string
@@ -240,6 +251,7 @@ type FormData = {
 
 const INITIAL: FormData = {
   nome: '', cpf: '', email: '', whatsapp: '', cidadeEstado: '',
+  planoContratado: '',
   dataInicial: new Date().toISOString().split('T')[0],
   possuiFilhos: '', nivelEscolaridade: '', areaFormacao: '', situacaoProfissional: '', cargoAtual: '',
   concursoAlmejado: '', cargoAlmejado: '', dataProva: '', cursoPrincipal: '', plataformaQuestoes: '',
@@ -273,6 +285,7 @@ export default function OnboardingPage() {
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'E-mail inválido'
     if (!form.whatsapp.trim()) e.whatsapp = 'Campo obrigatório'
     if (!form.cidadeEstado.trim()) e.cidadeEstado = 'Campo obrigatório'
+    if (!form.planoContratado) e.planoContratado = 'Campo obrigatório'
     if (!form.possuiFilhos) e.possuiFilhos = 'Campo obrigatório'
     if (!form.nivelEscolaridade) e.nivelEscolaridade = 'Campo obrigatório'
     if (!form.areaFormacao) e.areaFormacao = 'Campo obrigatório'
@@ -360,9 +373,7 @@ export default function OnboardingPage() {
       {/* Header */}
       <div className="bg-white border-b border-gray-100 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-md flex-shrink-0">
-            <GraduationCap className="h-5 w-5 text-white" />
-          </div>
+          <Image src="/logo.png" alt="Mentoria Experts" width={36} height={36} className="rounded-xl shadow-md flex-shrink-0" />
           <div>
             <p className="text-[14px] font-bold text-gray-900 leading-tight">Mentoria Experts</p>
             <p className="text-[11px] text-gray-400">Formulário de Onboarding</p>
@@ -441,6 +452,18 @@ export default function OnboardingPage() {
                 <FieldLabel label="Whatsapp" required />
                 <TextInput value={form.whatsapp} onChange={(v) => set('whatsapp', v)} placeholder="(11) 99999-9999" error={!!errors.whatsapp} />
                 <FieldError msg={errors.whatsapp} />
+              </div>
+
+              <div className="col-span-2" data-error={!!errors.planoContratado}>
+                <FieldLabel label="Plano contratado" required hint="Selecione o plano que você adquiriu." />
+                <SelectInput
+                  value={form.planoContratado}
+                  onChange={(v) => set('planoContratado', v)}
+                  options={PLANOS_CONTRATADOS}
+                  placeholder="Selecione seu plano..."
+                  error={!!errors.planoContratado}
+                />
+                <FieldError msg={errors.planoContratado} />
               </div>
 
               <div data-error={!!errors.possuiFilhos}>

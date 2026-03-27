@@ -26,7 +26,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       titulo: body.titulo,
       descricao: body.descricao,
       responsavelId: body.responsavelId,
-      prazo: body.prazo ? new Date(body.prazo) : undefined,
+      prazo: body.prazo ? new Date(`${String(body.prazo).substring(0, 10)}T12:00:00.000Z`) : undefined,
       urgencia: body.urgencia,
       status: body.status,
       alunoId: body.alunoId,

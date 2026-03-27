@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Search, Download, ChevronLeft, ChevronRight, ShieldAlert } from 'lucide-react'
+import { Plus, Search, Download, ChevronLeft, ChevronRight, ShieldAlert, Pencil, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { HoverBorderGradient } from '@/components/ui/hover-border-gradient'
+import { EditarAlunoModal } from '@/components/shared/EditarAlunoModal'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FaseBadge } from '@/components/shared/FaseBadge'
@@ -35,6 +36,8 @@ export default function AlunosPage() {
   const [plano, setPlano] = useState('')
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(true)
+  const [editarAluno, setEditarAluno] = useState<any | null>(null)
+  const [mostrarChurn, setMostrarChurn] = useState(false)
   const limit = 20
 
   const fetchAlunos = useCallback(async () => {
@@ -43,13 +46,14 @@ export default function AlunosPage() {
       page: String(page), limit: String(limit),
       ...(search && { search }), ...(fase && { fase }),
       ...(plano && { plano }), ...(status && { status }),
+      ...(!mostrarChurn && !status ? { excludeChurn: 'true' } : {}),
     })
     const res = await fetch(`/api/alunos?${params}`)
     const data = await res.json()
     setAlunos(data.alunos || [])
     setTotal(data.total || 0)
     setLoading(false)
-  }, [page, search, fase, plano, status])
+  }, [page, search, fase, plano, status, mostrarChurn])
 
   useEffect(() => { fetchAlunos() }, [fetchAlunos])
 
@@ -133,6 +137,19 @@ export default function AlunosPage() {
             <SelectItem value="INATIVO">Inativo</SelectItem>
           </SelectContent>
         </Select>
+
+        <button
+          onClick={() => { setMostrarChurn((v) => !v); setPage(1) }}
+          className={`flex items-center gap-1.5 h-8 px-3 rounded-md border text-[12px] font-medium transition-colors ${
+            mostrarChurn
+              ? 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
+              : 'bg-white border-gray-200 text-gray-400 hover:bg-gray-50 hover:text-gray-600'
+          }`}
+          title={mostrarChurn ? 'Ocultar alunos em churn' : 'Exibir alunos em churn'}
+        >
+          <EyeOff size={13} />
+          Churns {mostrarChurn ? 'visíveis' : 'ocultos'}
+        </button>
       </div>
 
       {/* Table */}
@@ -148,6 +165,7 @@ export default function AlunosPage() {
               <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Vencimento</th>
               <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Últ. follow-up</th>
               <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Risco churn</th>
+              <th className="px-4 py-2.5" />
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-50">
@@ -215,6 +233,17 @@ export default function AlunosPage() {
                       <span className="text-gray-300 text-[12px]">—</span>
                     )}
                   </td>
+                  <td className="px-3 py-3">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-indigo-600"
+                      onClick={(e) => { e.preventDefault(); setEditarAluno(aluno) }}
+                      title="Editar dados"
+                    >
+                      <Pencil size={13} />
+                    </Button>
+                  </td>
                 </tr>
               ))
             )}
@@ -238,6 +267,19 @@ export default function AlunosPage() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Modal de edição */}
+      {editarAluno && (
+        <EditarAlunoModal
+          aluno={editarAluno}
+          open={!!editarAluno}
+          onClose={() => setEditarAluno(null)}
+          onSaved={(atualizado) => {
+            setAlunos((prev) => prev.map((a) => a.id === atualizado.id ? { ...a, ...atualizado } : a))
+            setEditarAluno(null)
+          }}
+        />
       )}
     </div>
   )

@@ -268,7 +268,7 @@ function KanbanColumn({
       {/* Drop zone */}
       <div
         className={cn(
-          'flex-1 rounded-xl min-h-[120px] transition-colors duration-150 space-y-2.5 p-2',
+          'overflow-y-auto rounded-xl min-h-[120px] max-h-[calc(100vh-220px)] transition-colors duration-150 space-y-2.5 p-2',
           isDragOver && draggedId ? cfg.dropBg : 'bg-gray-50/50'
         )}
       >
@@ -496,8 +496,8 @@ export default function AlunosKanbanPage() {
       {loading ? (
         <KanbanSkeleton />
       ) : (
-        <div className="flex-1 overflow-x-auto overflow-y-hidden">
-          <div className="flex gap-4 p-5 h-full min-w-max">
+        <div className="flex-1 overflow-x-auto min-h-0">
+          <div className="flex gap-4 p-5 min-w-max items-start">
             {FASES.map((fase) => (
               <KanbanColumn
                 key={fase}

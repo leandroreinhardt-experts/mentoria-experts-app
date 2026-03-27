@@ -522,7 +522,7 @@ export default function DashboardPage() {
                           <span title="Follow-ups" className="flex items-center gap-0.5">
                             <MessageSquare size={9} className="text-amber-500" />{m.followUps}
                           </span>
-                          <span title="Análises" className="flex items-center gap-0.5">
+                          <span title="Alterações no plano" className="flex items-center gap-0.5">
                             <Activity size={9} className="text-indigo-500" />{m.analises}
                           </span>
                           {m.tarefasAtrasadas > 0 && (
@@ -546,7 +546,7 @@ export default function DashboardPage() {
           )}
           <p className="text-[10px] text-gray-400 mt-3 flex items-center gap-2">
             <MessageSquare size={9} /> Follow-ups &nbsp;
-            <Activity size={9} /> Análises &nbsp;
+            <Activity size={9} /> Alterações &nbsp;
             <AlertTriangle size={9} className="text-red-300" /> Tarefas atrasadas
           </p>
         </div>

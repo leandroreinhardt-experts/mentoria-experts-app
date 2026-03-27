@@ -44,6 +44,14 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   return NextResponse.json(aluno)
 }
 
+// Converte string "YYYY-MM-DD" para Date ao meio-dia UTC, evitando
+// que a conversão de fuso horário (UTC→BRT) mude o dia exibido.
+function parseDateOnly(str: string | null | undefined): Date | null {
+  if (!str) return null
+  // "YYYY-MM-DD" → adiciona T12:00:00Z (meio-dia UTC = 09:00 BRT, mesmo dia)
+  return new Date(`${str.substring(0, 10)}T12:00:00.000Z`)
+}
+
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
@@ -53,21 +61,22 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const aluno = await prisma.aluno.update({
     where: { id: params.id },
     data: {
-      nome: body.nome,
-      email: body.email,
-      whatsapp: body.whatsapp,
-      dataVencimento: body.dataVencimento ? new Date(body.dataVencimento) : undefined,
-      plano: body.plano,
-      cursoPrincipal: body.cursoPrincipal,
-      plataformaQuestoes: body.plataformaQuestoes,
-      areaEstudo: body.areaEstudo,
-      dataProva: body.dataProva ? new Date(body.dataProva) : null,
-      linkTutory: body.linkTutory,
-      incluiAcessoEstrategia: body.incluiAcessoEstrategia,
-      onboardingRespostas: body.onboardingRespostas,
-      responsavelAcompId: body.responsavelAcompId !== undefined
-        ? (body.responsavelAcompId || null)
-        : undefined,
+      ...(body.nome              !== undefined && { nome: body.nome }),
+      ...(body.cpf               !== undefined && { cpf: body.cpf }),
+      ...(body.email             !== undefined && { email: body.email || null }),
+      ...(body.whatsapp          !== undefined && { whatsapp: body.whatsapp || null }),
+      ...(body.dataEntrada       !== undefined && { dataEntrada: parseDateOnly(body.dataEntrada)! }),
+      ...(body.dataVencimento    !== undefined && { dataVencimento: parseDateOnly(body.dataVencimento)! }),
+      ...(body.plano             !== undefined && { plano: body.plano }),
+      ...(body.statusAtual       !== undefined && { statusAtual: body.statusAtual }),
+      ...(body.cursoPrincipal    !== undefined && { cursoPrincipal: body.cursoPrincipal || null }),
+      ...(body.plataformaQuestoes !== undefined && { plataformaQuestoes: body.plataformaQuestoes || null }),
+      ...(body.areaEstudo        !== undefined && { areaEstudo: body.areaEstudo || null }),
+      ...(body.dataProva         !== undefined && { dataProva: parseDateOnly(body.dataProva) }),
+      ...(body.linkTutory        !== undefined && { linkTutory: body.linkTutory || null }),
+      ...(body.incluiAcessoEstrategia !== undefined && { incluiAcessoEstrategia: body.incluiAcessoEstrategia }),
+      ...(body.onboardingRespostas !== undefined && { onboardingRespostas: body.onboardingRespostas }),
+      ...(body.responsavelAcompId !== undefined && { responsavelAcompId: body.responsavelAcompId || null }),
     },
     include: { responsavelAcomp: { select: { id: true, nome: true, cargo: true } } },
   })

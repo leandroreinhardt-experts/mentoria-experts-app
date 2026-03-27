@@ -48,7 +48,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     ...analises.map((a) => ({
       id: a.id,
       tipo: 'ANALISE',
-      titulo: 'Análise do plano de estudos',
+      titulo: 'Alteração no plano de estudos',
       descricao: a.observacao,
       responsavel: a.responsavel,
       data: a.realizadaEm,

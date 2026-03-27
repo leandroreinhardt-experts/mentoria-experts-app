@@ -15,7 +15,10 @@ export async function GET(_: NextRequest) {
   const ha20Dias = new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000)
   const ha15Dias = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000)
 
-  const [followUpsAtrasados, vencendoEm7Dias, tarefasAtrasadas, alunosCandidatos] =
+  const ha7Dias = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+  const membroId = session.user.id
+
+  const [followUpsAtrasados, vencendoEm7Dias, tarefasAtrasadas, mencoesPendentes, alunosCandidatos, notificacoesNaoLidas] =
     await Promise.all([
       // Follow-ups atrasados — PRO/ELITE sem follow-up há 20+ dias
       prisma.aluno.findMany({
@@ -62,6 +65,23 @@ export async function GET(_: NextRequest) {
         take: 5,
       }),
 
+      // Menções do membro logado nos últimos 7 dias
+      prisma.comentario.findMany({
+        where: {
+          mencoes: { has: membroId },
+          criadoEm: { gte: ha7Dias },
+        },
+        select: {
+          id: true,
+          texto: true,
+          criadoEm: true,
+          aluno: { select: { id: true, nome: true } },
+          autor: { select: { nome: true } },
+        },
+        orderBy: { criadoEm: 'desc' },
+        take: 5,
+      }),
+
       // Candidatos a risco crítico (vencimento próximo ou follow-up antigo)
       prisma.aluno.findMany({
         where: {
@@ -92,6 +112,14 @@ export async function GET(_: NextRequest) {
           },
         },
       }),
+
+      // Notificações não lidas do membro logado
+      prisma.notificacao.findMany({
+        where: { membroId, lida: false },
+        orderBy: { criadoEm: 'desc' },
+        take: 10,
+        select: { id: true, titulo: true, descricao: true, url: true, criadoEm: true },
+      }),
     ])
 
   // Calcular risco apenas para os candidatos filtrados
@@ -117,13 +145,40 @@ export async function GET(_: NextRequest) {
     followUpsAtrasados.length +
     vencendoEm7Dias.length +
     tarefasAtrasadas.length +
-    criticos.length
+    criticos.length +
+    mencoesPendentes.length +
+    notificacoesNaoLidas.length
 
   return NextResponse.json({
     followUpsAtrasados,
     vencendoEm7Dias,
     tarefasAtrasadas,
     criticos,
+    mencoesPendentes,
+    notificacoesNaoLidas,
     total,
   })
+}
+
+export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+
+  const body = await req.json()
+  const ids: string[] = body.ids || []
+
+  if (ids.length > 0) {
+    await prisma.notificacao.updateMany({
+      where: { id: { in: ids }, membroId: session.user.id },
+      data: { lida: true },
+    })
+  } else {
+    // Marcar todas como lidas
+    await prisma.notificacao.updateMany({
+      where: { membroId: session.user.id, lida: false },
+      data: { lida: true },
+    })
+  }
+
+  return NextResponse.json({ ok: true })
 }

@@ -17,7 +17,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       tipo: TipoTarefa.MANUAL,
       alunoId: params.id,
       responsavelId: body.responsavelId || session.user.id,
-      prazo: body.prazo ? new Date(body.prazo) : null,
+      prazo: body.prazo ? new Date(`${String(body.prazo).substring(0, 10)}T12:00:00.000Z`) : null,
       urgencia: body.urgencia || UrgenciaTarefa.MEDIA,
       status: StatusTarefa.A_FAZER,
     },

@@ -1,12 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import {
   LayoutDashboard, Users, Upload, CalendarDays, CheckSquare,
   Columns3, List, Trophy, Archive, Settings, UserCog, User,
-  LogOut, ChevronDown, GraduationCap, ListTodo, LayoutGrid,
+  LogOut, ChevronDown, ListTodo, LayoutGrid,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import React, { useState, useEffect } from 'react'
@@ -126,9 +127,7 @@ export function Sidebar() {
     <aside className="flex h-screen w-56 flex-col bg-white border-r border-gray-100 shadow-sm">
       {/* Logo */}
       <div className="flex h-14 items-center gap-2.5 px-4 border-b border-gray-100">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 shadow-md flex-shrink-0">
-          <GraduationCap className="h-4 w-4 text-white" />
-        </div>
+        <Image src="/logo.png" alt="Mentoria Experts" width={28} height={28} className="rounded-lg flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-semibold text-gray-900 leading-tight">Mentoria Experts</p>
           <p className="text-[10px] text-gray-400">CRM Educacional</p>

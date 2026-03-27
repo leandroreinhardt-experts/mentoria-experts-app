@@ -8,7 +8,12 @@ export function cn(...inputs: ClassValue[]) {
 export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return '—'
   const d = typeof date === 'string' ? new Date(date) : date
-  return d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+  // Usa componentes UTC para evitar que a conversão de fuso (UTC→BRT)
+  // mude o dia exibido — funciona tanto para T00:00Z quanto T12:00Z
+  const day   = String(d.getUTCDate()).padStart(2, '0')
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const year  = d.getUTCFullYear()
+  return `${day}/${month}/${year}`
 }
 
 export function formatDateTime(date: Date | string | null | undefined): string {

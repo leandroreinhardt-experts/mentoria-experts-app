@@ -40,6 +40,7 @@ export async function inicializarAluno(aluno: {
           prazo: t.prazo,
           urgencia: t.urgencia,
           status: StatusTarefa.A_FAZER,
+          responsavelId: t.responsavelId ?? null,
         })
       ),
     }),

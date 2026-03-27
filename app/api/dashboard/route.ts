@@ -15,6 +15,16 @@ export async function GET(_: NextRequest) {
 
   const now = new Date()
 
+  // Hoje em horário de Brasília (UTC-3)
+  const BRT_OFFSET_MS = -3 * 60 * 60 * 1000
+  const nowBRT = new Date(now.getTime() + BRT_OFFSET_MS)
+  const hojeBRTAno  = nowBRT.getUTCFullYear()
+  const hojeBRTMes  = nowBRT.getUTCMonth()
+  const hojeBRTDia  = nowBRT.getUTCDate()
+  // 00:00 BRT = 03:00 UTC ; 23:59:59 BRT = 02:59:59 UTC do dia seguinte
+  const hojeInicio  = new Date(Date.UTC(hojeBRTAno, hojeBRTMes, hojeBRTDia,  3,  0,  0))
+  const hojeFim     = new Date(Date.UTC(hojeBRTAno, hojeBRTMes, hojeBRTDia + 1, 2, 59, 59))
+
   // Períodos
   const inicioMes        = new Date(now.getFullYear(), now.getMonth(), 1)
   const inicioMesAnterior = new Date(now.getFullYear(), now.getMonth() - 1, 1)
@@ -23,8 +33,6 @@ export async function GET(_: NextRequest) {
   const em30Dias         = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
   const em15Dias         = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000)
   const ha20Dias         = new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000)
-  const hojeInicio       = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
-  const hojeFim          = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
 
   const [
     // ── Métricas atuais ──────────────────────────────────────

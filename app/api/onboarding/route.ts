@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Plano, StatusAluno, FaseMentoria, UrgenciaTarefa, StatusTarefa, TipoTarefa } from '@prisma/client'
 import { inicializarAluno } from '@/lib/aluno-utils'
+import { notificarEquipe } from '@/lib/notificacoes'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
 
   const {
     nome, cpf, email, whatsapp, cidadeEstado, dataInicial, dataProva, cargoAlmejado,
+    planoContratado,
     possuiFilhos, nivelEscolaridade, areaFormacao, situacaoProfissional, cargoAtual,
     concursoAlmejado, cursoPrincipal, plataformaQuestoes,
     motivosConcurso, tempoEstudoDia, formaEstudo, dificuldadesEstudo,
@@ -29,14 +31,33 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const dataEntrada = dataInicial ? new Date(dataInicial) : new Date()
-  const dataVencimento = new Date(dataEntrada)
-  dataVencimento.setFullYear(dataVencimento.getFullYear() + 1)
+  // Converte "YYYY-MM-DD" para meio-dia UTC, evitando que UTC→BRT mude o dia exibido
+  function parseDateOnly(str: string | null | undefined): Date | null {
+    if (!str) return null
+    return new Date(`${str.substring(0, 10)}T12:00:00.000Z`)
+  }
 
-  const dataProvaParsed = dataProva ? new Date(dataProva) : null
+  const dataEntrada = parseDateOnly(dataInicial) ?? new Date()
+
+  // Mapear plano contratado → enum Plano e duração em meses
+  function resolverPlano(planoStr: string): { plano: Plano; meses: number } {
+    const s = (planoStr || '').toLowerCase()
+    const meses = s.includes('anual') ? 12 : 6
+    let plano: Plano = Plano.START
+    if (s.startsWith('pro')) plano = Plano.PRO
+    else if (s.startsWith('elite')) plano = Plano.ELITE
+    return { plano, meses }
+  }
+
+  const { plano: planoResolvido, meses } = resolverPlano(planoContratado || '')
+  const dataVencimento = new Date(dataEntrada)
+  dataVencimento.setMonth(dataVencimento.getMonth() + meses)
+
+  const dataProvaParsed = parseDateOnly(dataProva)
 
   // Build onboardingRespostas JSON
   const onboardingRespostas = [
+    { pergunta: 'Plano contratado', resposta: planoContratado || '' },
     { pergunta: 'Cidade e Estado', resposta: cidadeEstado || '' },
     { pergunta: 'Possui filho(s)?', resposta: possuiFilhos || '' },
     { pergunta: 'Nível de escolaridade', resposta: nivelEscolaridade || '' },
@@ -75,7 +96,7 @@ export async function POST(req: NextRequest) {
       whatsapp: whatsapp ? String(whatsapp).trim() : null,
       dataEntrada,
       dataVencimento,
-      plano: Plano.START,
+      plano: planoResolvido,
       statusAtual: StatusAluno.ATIVO,
       faseAtual: FaseMentoria.ONBOARDING,
       faseManualOverride: false,
@@ -137,6 +158,13 @@ export async function POST(req: NextRequest) {
       prazo: prazoVerificacao,
       parentId: tarefaVerificacao.id,
     })),
+  })
+
+  // Notificar toda a equipe sobre o novo aluno
+  await notificarEquipe({
+    titulo: `Novo aluno via formulário: ${aluno.nome}`,
+    descricao: `Plano ${aluno.plano} · Verifique e complete os dados cadastrais.`,
+    url: `/alunos/${aluno.id}`,
   })
 
   return NextResponse.json({ id: aluno.id, nome: aluno.nome }, { status: 201 })

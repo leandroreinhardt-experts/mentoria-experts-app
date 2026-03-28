@@ -143,7 +143,7 @@ export function NotificationBell() {
   }, [])
 
   function handleDismiss(key: string, dbId?: string) {
-    setDismissed((prev) => new Set([...prev, key]))
+    setDismissed((prev) => new Set(Array.from(prev).concat(key)))
     if (dbId) marcarNotificacoesLidas([dbId])
   }
 

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { Plano, StatusAluno, FaseMentoria, UrgenciaTarefa, StatusTarefa, TipoTarefa } from '@prisma/client'
 import { inicializarAluno } from '@/lib/aluno-utils'
 import { notificarEquipe } from '@/lib/notificacoes'
+import { garantirDiaUtil } from '@/lib/utils'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -121,9 +122,10 @@ export async function POST(req: NextRequest) {
     incluiAcessoEstrategia: aluno.incluiAcessoEstrategia,
   })
 
-  // Prazo: 24 horas após o cadastro
-  const prazoVerificacao = new Date(dataEntrada)
-  prazoVerificacao.setHours(prazoVerificacao.getHours() + 24)
+  // Prazo: próximo dia útil após o cadastro
+  const prazoVerificacaoBase = new Date(dataEntrada)
+  prazoVerificacaoBase.setUTCDate(prazoVerificacaoBase.getUTCDate() + 1)
+  const prazoVerificacao = garantirDiaUtil(prazoVerificacaoBase)
 
   // Tarefa principal de verificação
   const tarefaVerificacao = await prisma.tarefa.create({

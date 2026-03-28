@@ -1,5 +1,5 @@
 import { Plano, TipoTarefa, UrgenciaTarefa } from '@prisma/client'
-import { addDays } from './utils'
+import { addDaysUtil } from './utils'
 
 // IDs dos membros responsáveis pelas tarefas de onboarding
 const RESP = {
@@ -27,7 +27,7 @@ export function getTarefasOnboarding(
     tarefas.push({
       titulo: 'Liberar acesso na plataforma Estratégia',
       tipo: TipoTarefa.ONBOARDING_ACESSO_ESTRATEGIA,
-      prazo: addDays(dataEntrada, 1),
+      prazo: addDaysUtil(dataEntrada, 1),
       urgencia: UrgenciaTarefa.ALTA,
       responsavelId: RESP.nataniel,
     })
@@ -36,7 +36,7 @@ export function getTarefasOnboarding(
   tarefas.push({
     titulo: 'Adicionar à lista de transmissão do WhatsApp',
     tipo: TipoTarefa.ONBOARDING_LISTA_TRANSMISSAO,
-    prazo: addDays(dataEntrada, 1),
+    prazo: addDaysUtil(dataEntrada, 1),
     urgencia: UrgenciaTarefa.ALTA,
     responsavelId: RESP.leandro,
   })
@@ -44,7 +44,7 @@ export function getTarefasOnboarding(
   tarefas.push({
     titulo: 'Elaborar plano de estudos',
     tipo: TipoTarefa.ONBOARDING_PLANO_ESTUDOS,
-    prazo: addDays(dataEntrada, 3),
+    prazo: addDaysUtil(dataEntrada, 3),
     urgencia: UrgenciaTarefa.ALTA,
     responsavelId: RESP.liane,
   })
@@ -54,7 +54,7 @@ export function getTarefasOnboarding(
     tarefas.push({
       titulo: 'Marcar reunião de onboarding',
       tipo: TipoTarefa.ONBOARDING_REUNIAO,
-      prazo: addDays(dataEntrada, 1),
+      prazo: addDaysUtil(dataEntrada, 1),
       urgencia: UrgenciaTarefa.ALTA,
       responsavelId: RESP.nataniel,
     })
@@ -62,7 +62,7 @@ export function getTarefasOnboarding(
     tarefas.push({
       titulo: 'Realizar primeiro follow-up',
       tipo: TipoTarefa.FOLLOWUP,
-      prazo: addDays(dataEntrada, 15),
+      prazo: addDaysUtil(dataEntrada, 15),
       urgencia: UrgenciaTarefa.MEDIA,
       responsavelId: RESP.nataniel,
     })

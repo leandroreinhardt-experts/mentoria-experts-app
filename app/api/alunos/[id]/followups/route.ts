@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Plano, StatusTarefa, TipoTarefa, UrgenciaTarefa } from '@prisma/client'
-import { addDays } from '@/lib/utils'
+import { addDaysUtil } from '@/lib/utils'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         tipo: TipoTarefa.FOLLOWUP,
         alunoId: params.id,
         responsavelId: aluno.responsavelAcompId ?? undefined,
-        prazo: addDays(now, 15),
+        prazo: addDaysUtil(now, 15),
         urgencia: UrgenciaTarefa.MEDIA,
         status: StatusTarefa.A_FAZER,
       },

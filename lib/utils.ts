@@ -44,6 +44,20 @@ export function addDays(date: Date, days: number): Date {
   return result
 }
 
+/** Avança a data para o próximo dia útil (seg–sex), se cair em fim de semana */
+export function garantirDiaUtil(date: Date): Date {
+  const d = new Date(date)
+  const dia = d.getUTCDay() // usa UTC para consistência com datas T12:00Z
+  if (dia === 6) d.setUTCDate(d.getUTCDate() + 2) // sáb → seg
+  else if (dia === 0) d.setUTCDate(d.getUTCDate() + 1) // dom → seg
+  return d
+}
+
+/** Soma N dias corridos e garante que o resultado caia em dia útil */
+export function addDaysUtil(date: Date, days: number): Date {
+  return garantirDiaUtil(addDays(date, days))
+}
+
 export function nowBrasilia(): Date {
   return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
 }

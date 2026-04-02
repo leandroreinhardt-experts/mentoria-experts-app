@@ -192,38 +192,38 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Alunos a contatar */}
-          <div className="bg-white rounded-xl border border-amber-100 p-4 space-y-3">
+          {/* Tarefas em andamento */}
+          <div className="bg-white rounded-xl border border-blue-100 p-4 space-y-3">
             <div className="flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-50">
-                <MessageSquare size={13} className="text-amber-500" />
+              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-50">
+                <CheckSquare size={13} className="text-blue-500" />
               </div>
               <h4 className="text-xs font-semibold text-gray-700">
-                Alunos a contatar
-                <span className="ml-1.5 bg-amber-100 text-amber-600 rounded-full px-1.5 py-0.5 text-[10px]">
-                  {hoje.alunosContatar.length}
+                Tarefas em andamento
+                <span className="ml-1.5 bg-blue-100 text-blue-600 rounded-full px-1.5 py-0.5 text-[10px]">
+                  {hoje.tarefasEmAndamento.length}
                 </span>
               </h4>
             </div>
-            {hoje.alunosContatar.length === 0 ? (
-              <p className="text-xs text-gray-400 py-2">Nenhum follow-up urgente.</p>
+            {hoje.tarefasEmAndamento.length === 0 ? (
+              <p className="text-xs text-gray-400 py-2">Nenhuma tarefa em andamento.</p>
             ) : (
               <div className="space-y-2">
-                {hoje.alunosContatar.map((a: any) => (
+                {hoje.tarefasEmAndamento.map((t: any) => (
                   <Link
-                    key={a.id}
-                    href={`/alunos/${a.id}`}
-                    className="flex items-center justify-between gap-2 hover:bg-amber-50/50 rounded-md -mx-1 px-1 py-0.5 transition-colors"
+                    key={t.id}
+                    href={t.aluno ? `/alunos/${t.aluno.id}` : '#'}
+                    className="flex items-center justify-between gap-2 hover:bg-blue-50/50 rounded-md -mx-1 px-1 py-0.5 transition-colors"
                   >
                     <div className="min-w-0">
-                      <p className="text-xs font-medium text-gray-800 truncate">{a.nome}</p>
-                      <p className="text-[10px] text-gray-400">
-                        Último: {a.dataUltimoFollowUp ? `${daysDiff(a.dataUltimoFollowUp)}d atrás` : 'nunca'}
-                      </p>
+                      <p className="text-xs font-medium text-gray-800 truncate">{t.titulo}</p>
+                      {t.aluno && (
+                        <p className="text-[10px] text-gray-400 truncate">{t.aluno.nome}</p>
+                      )}
                     </div>
-                    <span className="text-[10px] font-semibold bg-amber-50 text-amber-600 border border-amber-200 rounded px-1.5 py-0.5 shrink-0">
-                      {a.plano}
-                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <UrgenciaBadge urgencia={t.urgencia} className="text-[9px] px-1 py-0" />
+                    </div>
                   </Link>
                 ))}
               </div>

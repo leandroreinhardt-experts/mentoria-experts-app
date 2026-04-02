@@ -66,6 +66,7 @@ export async function GET(_: NextRequest) {
 
     // ── Hoje ─────────────────────────────────────────────────
     tarefasHoje,
+    tarefasEmAndamento,
 
     // ── Produtividade do time ────────────────────────────────
     followUpsDoMes,
@@ -163,6 +164,18 @@ export async function GET(_: NextRequest) {
       },
       orderBy: [{ urgencia: 'desc' }, { prazo: 'asc' }],
       take: 10,
+    }),
+
+    // ── Tarefas em andamento ─────────────────────────────────
+    prisma.tarefa.findMany({
+      where: { status: StatusTarefa.EM_ANDAMENTO, parentId: null },
+      select: {
+        id: true, titulo: true, prazo: true, urgencia: true,
+        responsavel: { select: { id: true, nome: true } },
+        aluno: { select: { id: true, nome: true } },
+      },
+      orderBy: [{ urgencia: 'desc' }, { prazo: 'asc' }],
+      take: 20,
     }),
 
     // ── Produtividade ────────────────────────────────────────
@@ -300,7 +313,7 @@ export async function GET(_: NextRequest) {
     riscoChurn: { resumo: resumoRisco, alunos: alunosEmRisco },
     hoje: {
       tarefas: tarefasHoje,
-      alunosContatar: followUpsAtrasados.slice(0, 5),
+      tarefasEmAndamento,
     },
     produtividadeTime,
     alertas: {

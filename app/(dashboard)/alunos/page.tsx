@@ -124,6 +124,7 @@ export default function AlunosPage() {
             <SelectItem value="START">START</SelectItem>
             <SelectItem value="PRO">PRO</SelectItem>
             <SelectItem value="ELITE">ELITE</SelectItem>
+            <SelectItem value="RETA_FINAL">Reta Final TJSC</SelectItem>
           </SelectContent>
         </Select>
         <Select value={status} onValueChange={(v) => { setStatus(v === '_all' ? '' : v); setPage(1) }}>

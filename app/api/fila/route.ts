@@ -16,7 +16,7 @@ export async function GET(_: NextRequest) {
   const alunosPendentes = await prisma.aluno.findMany({
     where: {
       statusAtual: StatusAluno.ATIVO,
-      plano: { in: [Plano.PRO, Plano.ELITE] },
+      plano: { in: [Plano.PRO, Plano.ELITE, Plano.RETA_FINAL] },
       OR: [
         { dataUltimoFollowUp: { lte: ha15Dias } },
         { dataUltimoFollowUp: null },
@@ -40,7 +40,7 @@ export async function GET(_: NextRequest) {
   const totalProElite = await prisma.aluno.count({
     where: {
       statusAtual: StatusAluno.ATIVO,
-      plano: { in: [Plano.PRO, Plano.ELITE] },
+      plano: { in: [Plano.PRO, Plano.ELITE, Plano.RETA_FINAL] },
     },
   })
   const maxDiario = Math.ceil(totalProElite / 15)

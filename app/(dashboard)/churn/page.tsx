@@ -7,9 +7,10 @@ import { formatDate } from '@/lib/utils'
 import { Plano } from '@prisma/client'
 
 const planoColors: Record<Plano, string> = {
-  START: 'bg-gray-100 text-gray-700',
-  PRO: 'bg-purple-100 text-purple-700',
-  ELITE: 'bg-yellow-100 text-yellow-700',
+  START:      'bg-gray-100 text-gray-700',
+  PRO:        'bg-purple-100 text-purple-700',
+  ELITE:      'bg-yellow-100 text-yellow-700',
+  RETA_FINAL: 'bg-emerald-100 text-emerald-700',
 }
 
 const motivoLabels: Record<string, string> = {

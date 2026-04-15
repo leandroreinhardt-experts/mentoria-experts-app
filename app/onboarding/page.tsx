@@ -42,6 +42,7 @@ const PLANOS_CONTRATADOS = [
   'Pro - Anual',
   'Elite - Semestral',
   'Elite - Anual',
+  'Reta Final TJSC',
 ]
 
 // ── Componentes auxiliares ─────────────────────────────────────────────────

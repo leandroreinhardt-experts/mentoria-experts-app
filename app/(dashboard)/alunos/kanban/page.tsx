@@ -75,9 +75,10 @@ const colunaConfig: Record<FaseMentoria, {
 }
 
 const planoConfig: Record<Plano, string> = {
-  START: 'bg-gray-100 text-gray-600 border-gray-200',
-  PRO:   'bg-violet-100 text-violet-700 border-violet-200',
-  ELITE: 'bg-amber-100 text-amber-700 border-amber-200',
+  START:      'bg-gray-100 text-gray-600 border-gray-200',
+  PRO:        'bg-violet-100 text-violet-700 border-violet-200',
+  ELITE:      'bg-amber-100 text-amber-700 border-amber-200',
+  RETA_FINAL: 'bg-emerald-100 text-emerald-700 border-emerald-200',
 }
 
 const riscoCardBorder: Record<NivelRisco, string> = {

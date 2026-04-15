@@ -19,6 +19,7 @@ enum Plano {
   START
   PRO
   ELITE
+  RETA_FINAL
 }
 
 enum StatusAluno {

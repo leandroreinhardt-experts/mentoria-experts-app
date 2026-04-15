@@ -44,7 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   })
 
   // Criar próximo follow-up automático (somente PRO/ELITE)
-  if (aluno.plano === Plano.PRO || aluno.plano === Plano.ELITE) {
+  if (aluno.plano === Plano.PRO || aluno.plano === Plano.ELITE || aluno.plano === Plano.RETA_FINAL) {
     await prisma.tarefa.create({
       data: {
         titulo: 'Realizar follow-up',

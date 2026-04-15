@@ -24,7 +24,7 @@ export async function GET(_: NextRequest) {
       prisma.aluno.findMany({
         where: {
           statusAtual: StatusAluno.ATIVO,
-          plano: { in: [Plano.PRO, Plano.ELITE] },
+          plano: { in: [Plano.PRO, Plano.ELITE, Plano.RETA_FINAL] },
           OR: [
             { dataUltimoFollowUp: { lte: ha20Dias } },
             { dataUltimoFollowUp: null },

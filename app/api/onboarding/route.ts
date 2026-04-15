@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
     let plano: Plano = Plano.START
     if (s.startsWith('pro')) plano = Plano.PRO
     else if (s.startsWith('elite')) plano = Plano.ELITE
+    else if (s.includes('reta final')) plano = Plano.RETA_FINAL
     return { plano, meses }
   }
 

@@ -32,9 +32,10 @@ import { FaseMentoria, Plano, StatusAluno, StatusTarefa, UrgenciaTarefa } from '
 
 const statusLabels = { ATIVO: 'Ativo', APROVADO: 'Aprovado', CHURN: 'Churn', INATIVO: 'Inativo' }
 const planoColors: Record<Plano, string> = {
-  START: 'bg-gray-100 text-gray-700',
-  PRO: 'bg-purple-100 text-purple-700',
-  ELITE: 'bg-yellow-100 text-yellow-700',
+  START:      'bg-gray-100 text-gray-700',
+  PRO:        'bg-purple-100 text-purple-700',
+  ELITE:      'bg-yellow-100 text-yellow-700',
+  RETA_FINAL: 'bg-emerald-100 text-emerald-700',
 }
 const statusTarefaLabel: Record<StatusTarefa, string> = {
   A_FAZER: 'A fazer', EM_ANDAMENTO: 'Em andamento', CONCLUIDA: 'Concluída',

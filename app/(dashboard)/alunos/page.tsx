@@ -22,9 +22,10 @@ const statusConfig: Record<StatusAluno, { label: string; className: string; glow
 }
 
 const planoConfig: Record<Plano, { className: string; glow: string }> = {
-  START: { className: 'bg-gray-50 text-gray-600 border border-gray-200',       glow: 'rgba(156, 163, 175, 0.9)' },
-  PRO:   { className: 'bg-violet-50 text-violet-700 border border-violet-200', glow: 'rgba(139, 92, 246, 0.9)'  },
-  ELITE: { className: 'bg-amber-50 text-amber-700 border border-amber-200',    glow: 'rgba(245, 158, 11, 0.9)'  },
+  START:      { className: 'bg-gray-50 text-gray-600 border border-gray-200',         glow: 'rgba(156, 163, 175, 0.9)' },
+  PRO:        { className: 'bg-violet-50 text-violet-700 border border-violet-200',   glow: 'rgba(139, 92, 246, 0.9)'  },
+  ELITE:      { className: 'bg-amber-50 text-amber-700 border border-amber-200',      glow: 'rgba(245, 158, 11, 0.9)'  },
+  RETA_FINAL: { className: 'bg-emerald-50 text-emerald-700 border border-emerald-200', glow: 'rgba(16, 185, 129, 0.9)'  },
 }
 
 export default function AlunosPage() {

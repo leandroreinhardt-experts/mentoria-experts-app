@@ -50,7 +50,7 @@ export function getTarefasOnboarding(
   })
 
   // Reunião de onboarding apenas para planos PRO e ELITE
-  if (plano === Plano.PRO || plano === Plano.ELITE) {
+  if (plano === Plano.PRO || plano === Plano.ELITE || plano === Plano.RETA_FINAL) {
     tarefas.push({
       titulo: 'Marcar reunião de onboarding',
       tipo: TipoTarefa.ONBOARDING_REUNIAO,

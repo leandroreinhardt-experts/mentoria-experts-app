@@ -43,6 +43,7 @@ export async function GET(_: NextRequest) {
     proAtivos,
     startAtivos,
     eliteAtivos,
+    retaFinalAtivos,
     distribuicaoFases,
 
     // ── Alertas existentes ───────────────────────────────────
@@ -82,6 +83,7 @@ export async function GET(_: NextRequest) {
     prisma.aluno.count({ where: { statusAtual: StatusAluno.ATIVO, plano: Plano.PRO } }),
     prisma.aluno.count({ where: { statusAtual: StatusAluno.ATIVO, plano: Plano.START } }),
     prisma.aluno.count({ where: { statusAtual: StatusAluno.ATIVO, plano: Plano.ELITE } }),
+    prisma.aluno.count({ where: { statusAtual: StatusAluno.ATIVO, plano: Plano.RETA_FINAL } }),
     prisma.aluno.groupBy({
       by: ['faseAtual'],
       where: { statusAtual: StatusAluno.ATIVO },
@@ -92,7 +94,7 @@ export async function GET(_: NextRequest) {
     prisma.aluno.findMany({
       where: {
         statusAtual: StatusAluno.ATIVO,
-        plano: { in: [Plano.PRO, Plano.ELITE] },
+        plano: { in: [Plano.PRO, Plano.ELITE, Plano.RETA_FINAL] },
         OR: [{ dataUltimoFollowUp: { lte: ha20Dias } }, { dataUltimoFollowUp: null }],
       },
       select: { id: true, nome: true, plano: true, dataUltimoFollowUp: true, faseAtual: true },
@@ -299,15 +301,17 @@ export async function GET(_: NextRequest) {
       proAtivos,
       startAtivos,
       eliteAtivos,
+      retaFinalAtivos,
       totalAprovados,
       totalFollowUpsNoMes,
     },
     tendencias,
     distribuicaoFases: distribuicaoFases.map((d) => ({ fase: d.faseAtual, total: d._count })),
     distribuicaoPlanos: [
-      { plano: 'PRO',   label: 'PRO',   count: proAtivos,   color: '#8b5cf6' },
-      { plano: 'START', label: 'START', count: startAtivos, color: '#6b7280' },
-      { plano: 'ELITE', label: 'ELITE', count: eliteAtivos, color: '#f59e0b' },
+      { plano: 'PRO',        label: 'PRO',        count: proAtivos,       color: '#8b5cf6' },
+      { plano: 'START',      label: 'START',      count: startAtivos,     color: '#6b7280' },
+      { plano: 'ELITE',      label: 'ELITE',      count: eliteAtivos,     color: '#f59e0b' },
+      { plano: 'RETA_FINAL', label: 'Reta Final', count: retaFinalAtivos, color: '#10b981' },
     ],
     historicoMensal: meses.map(({ key: _k, ...rest }) => rest),
     riscoChurn: { resumo: resumoRisco, alunos: alunosEmRisco },

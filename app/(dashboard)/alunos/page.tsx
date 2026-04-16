@@ -285,7 +285,7 @@ export default function AlunosPage() {
           <SelectTrigger className="h-8 text-sm border-gray-200">
             <SelectValue placeholder="Todos os concursos" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-56">
             <SelectItem value="_all">Todos os concursos</SelectItem>
             {tagOptions.concursos.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
@@ -299,7 +299,7 @@ export default function AlunosPage() {
           <SelectTrigger className="h-8 text-sm border-gray-200">
             <SelectValue placeholder="Todas as áreas" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-56">
             <SelectItem value="_all">Todas as áreas</SelectItem>
             {tagOptions.areasEstudo.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
           </SelectContent>

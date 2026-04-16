@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, User, Plus, Pencil } from 'lucide-react'
+import { ChevronLeft, ChevronRight, User, Plus, Pencil, X, ExternalLink, Clock, CheckCircle2, Circle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { UrgenciaBadge, urgenciaCores } from '@/components/shared/UrgenciaBadge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -12,10 +12,17 @@ import { UrgenciaTarefa } from '@prisma/client'
 import { toast } from '@/hooks/use-toast'
 
 const urgenciaEventCor: Record<UrgenciaTarefa, string> = {
-  BAIXA: 'bg-gray-100 text-gray-700 border-gray-200',
-  MEDIA: 'bg-blue-100 text-blue-700 border-blue-200',
-  ALTA: 'bg-orange-100 text-orange-700 border-orange-200',
+  BAIXA:   'bg-gray-100 text-gray-700 border-gray-200',
+  MEDIA:   'bg-blue-100 text-blue-700 border-blue-200',
+  ALTA:    'bg-orange-100 text-orange-700 border-orange-200',
   CRITICA: 'bg-red-100 text-red-700 border-red-200',
+}
+
+const urgenciaDayPanelCor: Record<UrgenciaTarefa, string> = {
+  BAIXA:   'border-l-gray-300 bg-gray-50',
+  MEDIA:   'border-l-blue-400 bg-blue-50',
+  ALTA:    'border-l-orange-400 bg-orange-50',
+  CRITICA: 'border-l-red-500 bg-red-50',
 }
 
 const avatarCores = [
@@ -23,26 +30,35 @@ const avatarCores = [
   'bg-orange-500', 'bg-pink-500', 'bg-cyan-500',
 ]
 
+const urgenciaLabel: Record<UrgenciaTarefa, string> = {
+  BAIXA: 'Baixa', MEDIA: 'Média', ALTA: 'Alta', CRITICA: 'Crítica',
+}
+
 export default function CalendarioPage() {
-  const [tarefas, setTarefas] = useState<any[]>([])
-  const [alunosProva, setAlunosProva] = useState<any[]>([])
-  const [alunosTodos, setAlunosTodos] = useState<any[]>([])
-  const [membros, setMembros] = useState<any[]>([])
-  const [viewMode, setViewMode] = useState<'month' | 'week'>('month')
-  const [currentDate, setCurrentDate] = useState(new Date())
+  const [tarefas, setTarefas]           = useState<any[]>([])
+  const [alunosProva, setAlunosProva]   = useState<any[]>([])
+  const [alunosTodos, setAlunosTodos]   = useState<any[]>([])
+  const [membros, setMembros]           = useState<any[]>([])
+  const [viewMode, setViewMode]         = useState<'month' | 'week'>('month')
+  const [currentDate, setCurrentDate]   = useState(new Date())
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
-  const [showTarefas, setShowTarefas] = useState(true)
-  const [showProvas, setShowProvas] = useState(true)
+  const [showTarefas, setShowTarefas]   = useState(true)
+  const [showProvas, setShowProvas]     = useState(true)
   const [mostrarConcluidas, setMostrarConcluidas] = useState(false)
   const [filtroResponsavel, setFiltroResponsavel] = useState('TODOS')
+
+  // Painel do dia
+  const [selectedDay, setSelectedDay]   = useState<Date | null>(null)
+
   // Modal criar tarefa
-  const [novoModal, setNovoModal] = useState(false)
-  const [novoForm, setNovoForm] = useState<TarefaFormData>(tarefaFormInicial)
-  const [salvando, setSalvando] = useState(false)
+  const [novoModal, setNovoModal]       = useState(false)
+  const [novoForm, setNovoForm]         = useState<TarefaFormData>(tarefaFormInicial)
+  const [salvando, setSalvando]         = useState(false)
+
   // Modal editar tarefa
-  const [editModal, setEditModal] = useState(false)
-  const [editForm, setEditForm] = useState<TarefaFormData>(tarefaFormInicial)
-  const [editandoId, setEditandoId] = useState<string | null>(null)
+  const [editModal, setEditModal]       = useState(false)
+  const [editForm, setEditForm]         = useState<TarefaFormData>(tarefaFormInicial)
+  const [editandoId, setEditandoId]     = useState<string | null>(null)
   const [salvandoEdit, setSalvandoEdit] = useState(false)
 
   function fetchTarefas() {
@@ -116,9 +132,7 @@ export default function CalendarioPage() {
     }
   }
 
-  function isConcluida(t: any) {
-    return t.status === 'CONCLUIDA'
-  }
+  function isConcluida(t: any) { return t.status === 'CONCLUIDA' }
 
   function getDaysInMonth(year: number, month: number) {
     return new Date(year, month + 1, 0).getDate()
@@ -132,30 +146,223 @@ export default function CalendarioPage() {
       : t.responsavelId === filtroResponsavel
     )
 
+  // Tarefas do dia (sem filtro de concluída — para o painel mostrar tudo)
+  function getTarefasForDay(day: Date) {
+    const dayStr = day.toISOString().split('T')[0]
+    return tarefas.filter((t) =>
+      t.prazo && new Date(t.prazo).toISOString().split('T')[0] === dayStr
+    )
+  }
+
   function getEventsForDay(day: Date) {
     const dayStr = day.toISOString().split('T')[0]
     const events: any[] = []
     if (showTarefas) {
       tarefasFiltradas.forEach((t) => {
-        if (t.prazo && new Date(t.prazo).toISOString().split('T')[0] === dayStr) {
+        if (t.prazo && new Date(t.prazo).toISOString().split('T')[0] === dayStr)
           events.push({ type: 'tarefa', ...t })
-        }
       })
     }
     if (showProvas) {
       alunosProva.forEach((a) => {
-        if (a.dataProva && new Date(a.dataProva).toISOString().split('T')[0] === dayStr) {
+        if (a.dataProva && new Date(a.dataProva).toISOString().split('T')[0] === dayStr)
           events.push({ type: 'prova', ...a })
-        }
       })
     }
     return events
   }
 
-  function dayToStr(day: Date) {
-    return day.toISOString().split('T')[0]
+  function dayToStr(day: Date) { return day.toISOString().split('T')[0] }
+
+  // ─── Painel lateral do dia ────────────────────────────────────────────────
+  function DayPanel() {
+    if (!selectedDay) return null
+    const tarefasDia = getTarefasForDay(selectedDay)
+    const provasDia  = alunosProva.filter((a) =>
+      a.dataProva && new Date(a.dataProva).toISOString().split('T')[0] === dayToStr(selectedDay)
+    )
+    const pendentes  = tarefasDia.filter((t) => t.status !== 'CONCLUIDA')
+    const concluidas = tarefasDia.filter((t) => t.status === 'CONCLUIDA')
+
+    const dataFormatada = selectedDay.toLocaleDateString('pt-BR', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+    })
+
+    return (
+      <>
+        {/* Overlay */}
+        <div
+          className="fixed inset-0 bg-black/20 z-40"
+          onClick={() => setSelectedDay(null)}
+        />
+        {/* Drawer */}
+        <div className="fixed right-0 top-0 h-full w-[400px] bg-white border-l border-gray-200 shadow-2xl z-50 flex flex-col">
+          {/* Header */}
+          <div className="flex items-start justify-between px-5 py-4 border-b border-gray-100">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 capitalize">
+                {selectedDay.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'UTC' })}
+              </p>
+              <h2 className="text-xl font-bold text-gray-900">
+                {selectedDay.getUTCDate()} de{' '}
+                {selectedDay.toLocaleDateString('pt-BR', { month: 'long', timeZone: 'UTC' })}
+              </h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {pendentes.length} pendente{pendentes.length !== 1 ? 's' : ''}
+                {concluidas.length > 0 && ` · ${concluidas.length} concluída${concluidas.length !== 1 ? 's' : ''}`}
+                {provasDia.length > 0 && ` · ${provasDia.length} prova${provasDia.length !== 1 ? 's' : ''}`}
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => { abrirNovaTarefa(dayToStr(selectedDay)); setSelectedDay(null) }}
+                className="flex items-center gap-1.5 h-7 px-2.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-[12px] font-medium transition-colors"
+                title="Nova tarefa neste dia"
+              >
+                <Plus size={13} /> Nova tarefa
+              </button>
+              <button
+                onClick={() => setSelectedDay(null)}
+                className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+
+            {/* Provas */}
+            {provasDia.length > 0 && (
+              <section>
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-purple-500 mb-2">
+                  📅 Provas ({provasDia.length})
+                </h3>
+                <div className="space-y-2">
+                  {provasDia.map((a) => (
+                    <Link
+                      key={a.id}
+                      href={`/alunos/${a.id}`}
+                      onClick={() => setSelectedDay(null)}
+                      className="flex items-center justify-between p-3 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 transition-colors group"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-purple-800">{a.nome}</p>
+                        {a.areaEstudo && <p className="text-xs text-purple-500 mt-0.5">{a.areaEstudo}</p>}
+                      </div>
+                      <ExternalLink size={13} className="text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Tarefas pendentes */}
+            {pendentes.length > 0 && (
+              <section>
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                  Pendentes ({pendentes.length})
+                </h3>
+                <div className="space-y-2">
+                  {pendentes.map((t) => (
+                    <div
+                      key={t.id}
+                      className={`rounded-lg border border-l-4 p-3 ${urgenciaDayPanelCor[t.urgencia as UrgenciaTarefa] ?? 'border-l-gray-300 bg-gray-50'}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Circle size={12} className="text-gray-400 flex-shrink-0" />
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                              {urgenciaLabel[t.urgencia as UrgenciaTarefa]}
+                            </span>
+                          </div>
+                          <p className="text-sm font-semibold text-gray-800 leading-snug">{t.titulo}</p>
+                          {t.descricao && (
+                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{t.descricao}</p>
+                          )}
+                          <div className="flex items-center gap-3 mt-2 flex-wrap">
+                            {t.aluno && (
+                              <Link
+                                href={`/alunos/${t.aluno.id}`}
+                                onClick={() => setSelectedDay(null)}
+                                className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                              >
+                                <ExternalLink size={10} />
+                                {t.aluno.nome}
+                              </Link>
+                            )}
+                            {t.responsavel && (
+                              <span className="flex items-center gap-1 text-xs text-gray-500">
+                                <div className={`w-4 h-4 rounded-full ${avatarCores[membros.findIndex(m => m.id === t.responsavel.id) % avatarCores.length] ?? 'bg-gray-400'} text-white text-[9px] flex items-center justify-center font-bold`}>
+                                  {t.responsavel.nome?.[0]?.toUpperCase()}
+                                </div>
+                                {t.responsavel.nome}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => { abrirEdicao(t); setSelectedDay(null) }}
+                          className="flex-shrink-0 h-6 w-6 flex items-center justify-center rounded hover:bg-white/70 text-gray-400 hover:text-indigo-600 transition-colors"
+                          title="Editar"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Tarefas concluídas */}
+            {concluidas.length > 0 && (
+              <section>
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-emerald-500 mb-2">
+                  Concluídas ({concluidas.length})
+                </h3>
+                <div className="space-y-2">
+                  {concluidas.map((t) => (
+                    <div key={t.id} className="rounded-lg border border-gray-100 bg-gray-50 p-3 opacity-60">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 size={13} className="text-emerald-500 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-600 line-through truncate">{t.titulo}</p>
+                          {t.aluno && (
+                            <p className="text-xs text-gray-400 truncate">{t.aluno.nome}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Vazio */}
+            {tarefasDia.length === 0 && provasDia.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                  <Clock size={22} className="text-gray-300" />
+                </div>
+                <p className="text-sm font-medium text-gray-400">Nenhuma tarefa neste dia</p>
+                <button
+                  onClick={() => { abrirNovaTarefa(dayToStr(selectedDay)); setSelectedDay(null) }}
+                  className="mt-3 text-xs text-indigo-500 hover:text-indigo-700 font-medium"
+                >
+                  + Criar nova tarefa
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </>
+    )
   }
 
+  // ─── Renderização do mês ──────────────────────────────────────────────────
   function renderMes() {
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth()
@@ -188,14 +395,25 @@ export default function CalendarioPage() {
             {week.map((day, di) => {
               const events = day ? getEventsForDay(day) : []
               const isToday = day?.toISOString().split('T')[0] === today
+              const isSelected = selectedDay && day && dayToStr(day) === dayToStr(selectedDay)
               return (
                 <div key={di} className={`min-h-[100px] border-r border-gray-100 p-1.5 group/day ${!day ? 'bg-gray-50' : ''}`}>
                   {day && (
                     <>
                       <div className="flex items-center justify-between mb-0.5">
-                        <span className={`text-xs font-semibold inline-flex h-6 w-6 items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white' : 'text-gray-700'}`}>
+                        <button
+                          onClick={() => setSelectedDay(isSelected ? null : day)}
+                          className={`text-xs font-semibold inline-flex h-6 w-6 items-center justify-center rounded-full transition-colors ${
+                            isToday
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : isSelected
+                                ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-400'
+                                : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                          title={`Ver tarefas de ${day.getDate()}`}
+                        >
                           {day.getDate()}
-                        </span>
+                        </button>
                         <button
                           onClick={() => abrirNovaTarefa(dayToStr(day))}
                           className="opacity-0 group-hover/day:opacity-100 transition-opacity h-5 w-5 flex items-center justify-center rounded hover:bg-indigo-100 text-gray-400 hover:text-indigo-600"
@@ -221,7 +439,14 @@ export default function CalendarioPage() {
                             )}
                           </button>
                         ))}
-                        {events.length > 3 && <span className="text-[10px] text-gray-400">+{events.length - 3} mais</span>}
+                        {events.length > 3 && (
+                          <button
+                            onClick={() => setSelectedDay(day)}
+                            className="text-[10px] text-indigo-500 hover:text-indigo-700 font-medium w-full text-left"
+                          >
+                            +{events.length - 3} mais
+                          </button>
+                        )}
                       </div>
                     </>
                   )}
@@ -234,6 +459,7 @@ export default function CalendarioPage() {
     )
   }
 
+  // ─── Renderização da semana ───────────────────────────────────────────────
   function renderSemana() {
     const startOfWeek = new Date(currentDate)
     const day = startOfWeek.getDay()
@@ -251,13 +477,17 @@ export default function CalendarioPage() {
         {days.map((day, i) => {
           const events = getEventsForDay(day)
           const isToday = day.toISOString().split('T')[0] === today
+          const isSelected = selectedDay && dayToStr(day) === dayToStr(selectedDay)
           return (
-            <div key={i} className={`border rounded-lg p-2 min-h-[200px] group/day ${isToday ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white'}`}>
+            <div key={i} className={`border rounded-lg p-2 min-h-[200px] group/day ${isToday ? 'border-blue-400 bg-blue-50' : isSelected ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 bg-white'}`}>
               <div className="flex items-center justify-between mb-2">
-                <div>
+                <button
+                  onClick={() => setSelectedDay(isSelected ? null : day)}
+                  className="text-left"
+                >
                   <div className="text-xs text-gray-500">{diasSemana[i]}</div>
-                  <div className={`text-sm font-bold ${isToday ? 'text-blue-600' : 'text-gray-800'}`}>{day.getDate()}</div>
-                </div>
+                  <div className={`text-sm font-bold ${isToday ? 'text-blue-600' : isSelected ? 'text-indigo-600' : 'text-gray-800'}`}>{day.getDate()}</div>
+                </button>
                 <button
                   onClick={() => abrirNovaTarefa(dayToStr(day))}
                   className="opacity-0 group-hover/day:opacity-100 transition-opacity h-5 w-5 flex items-center justify-center rounded hover:bg-indigo-100 text-gray-400 hover:text-indigo-600"
@@ -390,7 +620,7 @@ export default function CalendarioPage() {
         labelSubmit="Salvar"
       />
 
-      {/* Drawer de evento */}
+      {/* Modal detalhe de evento individual */}
       {selectedEvent && (
         <Dialog open={!!selectedEvent} onOpenChange={() => setSelectedEvent(null)}>
           <DialogContent>
@@ -437,6 +667,9 @@ export default function CalendarioPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Painel lateral do dia */}
+      <DayPanel />
     </div>
   )
 }

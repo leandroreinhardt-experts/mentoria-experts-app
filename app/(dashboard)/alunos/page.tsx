@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import {
-  Plus, Search, Download, ChevronLeft, ChevronRight,
-  Pencil, Filter, ArrowUpDown, X, Check, ChevronDown,
+  Plus, Search, Download,
+  Pencil, Filter, ArrowUpDown, X, Check, ChevronDown, Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { HoverBorderGradient } from '@/components/ui/hover-border-gradient'
@@ -114,11 +114,13 @@ export default function AlunosPage() {
   const [alunos, setAlunos]         = useState<any[]>([])
   const [total, setTotal]           = useState(0)
   const [page, setPage]             = useState(1)
+  const [hasMore, setHasMore]       = useState(true)
   const [search, setSearch]         = useState('')
   const [fase, setFase]             = useState('')
   const [plano, setPlano]           = useState('')
   const [status, setStatus]         = useState('')
   const [loading, setLoading]       = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [editarAluno, setEditarAluno] = useState<any | null>(null)
   const [mostrarChurn, setMostrarChurn] = useState(false)
   const [concursoTag, setConcursoTag]   = useState('')
@@ -134,57 +136,88 @@ export default function AlunosPage() {
   // sort
   const [sortKey, setSortKey] = useState<SortKey>('criadoEm')
 
-  const limit = 20
+  // infinite scroll sentinel
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  const limit = 30
 
   useEffect(() => {
     fetch('/api/alunos/tags').then(r => r.json()).then(setTagOptions).catch(() => {})
   }, [])
 
-  const fetchAlunos = useCallback(async () => {
-    setLoading(true)
-
+  // Constrói os params de busca (sem page)
+  const buildParams = useCallback((pageNum: number) => {
     const { sortBy, sortDir } = sortKeyToApiParams(sortKey)
-    // riscoChurn is a computed field – sort client-side after fetch
     const serverSortBy  = sortKey === 'riscoChurn' ? 'criadoEm' : sortBy
     const serverSortDir = sortKey === 'riscoChurn' ? 'desc'      : sortDir
-
-    const params = new URLSearchParams({
-      page: String(page), limit: String(limit),
-      ...(search              && { search }),
-      ...(fase                && { fase }),
-      ...(plano               && { plano }),
-      ...(status              && { status }),
+    return new URLSearchParams({
+      page: String(pageNum), limit: String(limit),
+      ...(search               && { search }),
+      ...(fase                 && { fase }),
+      ...(plano                && { plano }),
+      ...(status               && { status }),
       ...(!mostrarChurn && !status ? { excludeChurn: 'true' } : {}),
-      ...(concursoTag         && { concurso:    concursoTag }),
-      ...(areaEstudoTag       && { areaEstudo:  areaEstudoTag }),
-      ...(dataEntradaInicio   && { dataEntradaInicio }),
-      ...(dataEntradaFim      && { dataEntradaFim }),
+      ...(concursoTag          && { concurso:   concursoTag }),
+      ...(areaEstudoTag        && { areaEstudo: areaEstudoTag }),
+      ...(dataEntradaInicio    && { dataEntradaInicio }),
+      ...(dataEntradaFim       && { dataEntradaFim }),
       ...(dataVencimentoInicio && { dataVencimentoInicio }),
-      ...(dataVencimentoFim   && { dataVencimentoFim }),
+      ...(dataVencimentoFim    && { dataVencimentoFim }),
       sortBy:  serverSortBy,
       sortDir: serverSortDir,
     })
-
-    const res  = await fetch(`/api/alunos?${params}`)
-    const data = await res.json()
-    let lista: any[] = data.alunos || []
-
-    // client-side risco churn sort
-    if (sortKey === 'riscoChurn') {
-      lista = [...lista].sort((a, b) => {
-        const sa = a.riscoChurn?.score ?? 0
-        const sb = b.riscoChurn?.score ?? 0
-        return sb - sa
-      })
-    }
-
-    setAlunos(lista)
-    setTotal(data.total || 0)
-    setLoading(false)
-  }, [page, search, fase, plano, status, mostrarChurn, concursoTag, areaEstudoTag,
+  }, [search, fase, plano, status, mostrarChurn, concursoTag, areaEstudoTag,
       sortKey, dataEntradaInicio, dataEntradaFim, dataVencimentoInicio, dataVencimentoFim])
 
-  useEffect(() => { fetchAlunos() }, [fetchAlunos])
+  // Carrega a primeira página (reset) sempre que filtros/ordenação mudam
+  const fetchPrimeiraPagina = useCallback(async () => {
+    setLoading(true)
+    setPage(1)
+    const res  = await fetch(`/api/alunos?${buildParams(1)}`)
+    const data = await res.json()
+    let lista: any[] = data.alunos || []
+    if (sortKey === 'riscoChurn') {
+      lista = [...lista].sort((a, b) => (b.riscoChurn?.score ?? 0) - (a.riscoChurn?.score ?? 0))
+    }
+    setAlunos(lista)
+    setTotal(data.total || 0)
+    setHasMore(lista.length === limit && lista.length < (data.total || 0))
+    setLoading(false)
+  }, [buildParams, sortKey])
+
+  useEffect(() => { fetchPrimeiraPagina() }, [fetchPrimeiraPagina])
+
+  // Carrega próxima página e acumula
+  const fetchProximaPagina = useCallback(async () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    const nextPage = page + 1
+    const res  = await fetch(`/api/alunos?${buildParams(nextPage)}`)
+    const data = await res.json()
+    let novos: any[] = data.alunos || []
+    if (sortKey === 'riscoChurn') {
+      novos = [...novos].sort((a, b) => (b.riscoChurn?.score ?? 0) - (a.riscoChurn?.score ?? 0))
+    }
+    setAlunos(prev => {
+      const ids = new Set(prev.map((a) => a.id))
+      return [...prev, ...novos.filter((a) => !ids.has(a.id))]
+    })
+    setPage(nextPage)
+    setHasMore(novos.length === limit && alunos.length + novos.length < (data.total || 0))
+    setLoadingMore(false)
+  }, [loadingMore, hasMore, page, buildParams, sortKey, alunos.length])
+
+  // IntersectionObserver no sentinel
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) fetchProximaPagina() },
+      { rootMargin: '200px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [fetchProximaPagina])
 
   function exportarCSV() {
     const headers = ['Nome', 'CPF', 'Email', 'WhatsApp', 'Plano', 'Status', 'Fase', 'Entrada', 'Vencimento']
@@ -203,7 +236,7 @@ export default function AlunosPage() {
     setMostrarChurn(false)
     setDataEntradaInicio(''); setDataEntradaFim('')
     setDataVencimentoInicio(''); setDataVencimentoFim('')
-    setPage(1)
+    // page reset happens automatically via fetchPrimeiraPagina dependency chain
   }
 
   const activeFiltrosCount = [
@@ -212,8 +245,6 @@ export default function AlunosPage() {
     dataVencimentoInicio || dataVencimentoFim,
     mostrarChurn ? 'churn' : '',
   ].filter(Boolean).length
-
-  const totalPages = Math.ceil(total / limit)
 
   // ─── filter panel content ──────────────────────────────────────────────────
   const FilterPanel = (
@@ -640,23 +671,20 @@ export default function AlunosPage() {
         </table>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between px-7 py-3 border-t border-gray-100 bg-white">
-          <p className="text-xs text-gray-400">
-            {(page - 1) * limit + 1}–{Math.min(page * limit, total)} de {total} alunos
-          </p>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-7 w-7 border-gray-200" onClick={() => setPage(p => p - 1)} disabled={page === 1}>
-              <ChevronLeft size={14} />
-            </Button>
-            <span className="px-3 text-xs text-gray-600 font-medium">{page} / {totalPages}</span>
-            <Button variant="outline" size="icon" className="h-7 w-7 border-gray-200" onClick={() => setPage(p => p + 1)} disabled={page === totalPages}>
-              <ChevronRight size={14} />
-            </Button>
+      {/* Infinite scroll sentinel + loading indicator */}
+      <div ref={sentinelRef} className="px-7 py-4 flex items-center justify-center">
+        {loadingMore && (
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <Loader2 size={14} className="animate-spin" />
+            Carregando mais...
           </div>
-        </div>
-      )}
+        )}
+        {!hasMore && alunos.length > 0 && !loading && (
+          <p className="text-xs text-gray-300">
+            {alunos.length} de {total} alunos
+          </p>
+        )}
+      </div>
 
       {/* Modal de edição */}
       {editarAluno && (

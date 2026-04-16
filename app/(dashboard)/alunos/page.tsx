@@ -518,6 +518,8 @@ export default function AlunosPage() {
               <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Plano</th>
               <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Status</th>
               <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Fase</th>
+              <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Concurso / Cargo</th>
+              <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Área de estudo</th>
               <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Entrada</th>
               <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Vencimento</th>
               <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Últ. follow-up</th>
@@ -528,7 +530,7 @@ export default function AlunosPage() {
           <tbody className="bg-white divide-y divide-gray-50">
             {loading ? (
               <tr>
-                <td colSpan={9} className="text-center py-16">
+                <td colSpan={11} className="text-center py-16">
                   <div className="flex flex-col items-center gap-2">
                     <div className="h-6 w-6 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
                     <p className="text-sm text-gray-400">Carregando...</p>
@@ -537,7 +539,7 @@ export default function AlunosPage() {
               </tr>
             ) : alunos.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-16 text-sm text-gray-400">
+                <td colSpan={11} className="text-center py-16 text-sm text-gray-400">
                   Nenhum aluno encontrado
                 </td>
               </tr>
@@ -562,6 +564,36 @@ export default function AlunosPage() {
                   </td>
                   <td className="px-4 py-3">
                     {aluno.statusAtual === 'ATIVO' && <FaseBadge fase={aluno.faseAtual as FaseMentoria} />}
+                  </td>
+                  <td className="px-4 py-3 max-w-[180px]">
+                    {aluno.concursos?.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {aluno.concursos.slice(0, 2).map((c: string) => (
+                          <span key={c} className="inline-block px-1.5 py-0.5 rounded bg-sky-50 border border-sky-100 text-sky-700 text-[10px] font-medium truncate max-w-[160px]" title={c}>{c}</span>
+                        ))}
+                        {aluno.concursos.length > 2 && (
+                          <span className="text-[10px] text-gray-400">+{aluno.concursos.length - 2}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-gray-300 text-[12px]">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 max-w-[160px]">
+                    {aluno.areasEstudo?.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {aluno.areasEstudo.slice(0, 2).map((a: string) => (
+                          <span key={a} className="inline-block px-1.5 py-0.5 rounded bg-violet-50 border border-violet-100 text-violet-700 text-[10px] font-medium truncate max-w-[140px]" title={a}>{a}</span>
+                        ))}
+                        {aluno.areasEstudo.length > 2 && (
+                          <span className="text-[10px] text-gray-400">+{aluno.areasEstudo.length - 2}</span>
+                        )}
+                      </div>
+                    ) : aluno.areaEstudo ? (
+                      <span className="inline-block px-1.5 py-0.5 rounded bg-violet-50 border border-violet-100 text-violet-700 text-[10px] font-medium truncate max-w-[140px]" title={aluno.areaEstudo}>{aluno.areaEstudo}</span>
+                    ) : (
+                      <span className="text-gray-300 text-[12px]">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-[13px]">{formatDate(aluno.dataEntrada)}</td>
                   <td className="px-4 py-3 text-gray-500 text-[13px]">{formatDate(aluno.dataVencimento)}</td>

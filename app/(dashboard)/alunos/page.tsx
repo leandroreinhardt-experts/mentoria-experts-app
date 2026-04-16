@@ -136,8 +136,9 @@ export default function AlunosPage() {
   // sort
   const [sortKey, setSortKey] = useState<SortKey>('criadoEm')
 
-  // infinite scroll sentinel
-  const sentinelRef = useRef<HTMLDivElement>(null)
+  // infinite scroll
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const sentinelRef        = useRef<HTMLTableRowElement>(null)
 
   const limit = 30
 
@@ -207,13 +208,14 @@ export default function AlunosPage() {
     setLoadingMore(false)
   }, [loadingMore, hasMore, page, buildParams, sortKey, alunos.length])
 
-  // IntersectionObserver no sentinel
+  // IntersectionObserver — root é o container com scroll
   useEffect(() => {
-    const el = sentinelRef.current
-    if (!el) return
+    const el   = sentinelRef.current
+    const root = scrollContainerRef.current
+    if (!el || !root) return
     const observer = new IntersectionObserver(
       (entries) => { if (entries[0].isIntersecting) fetchProximaPagina() },
-      { rootMargin: '200px' }
+      { root, rootMargin: '300px' }
     )
     observer.observe(el)
     return () => observer.disconnect()
@@ -541,7 +543,7 @@ export default function AlunosPage() {
       )}
 
       {/* Table */}
-      <div className="flex-1 overflow-auto">
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-gray-50 border-b border-gray-100 z-10">
             <tr>
@@ -667,23 +669,23 @@ export default function AlunosPage() {
                 </tr>
               ))
             )}
+
+            {/* Sentinel row — dentro do container de scroll */}
+            <tr ref={sentinelRef}>
+              <td colSpan={11} className="px-7 py-5 text-center">
+                {loadingMore && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+                    <Loader2 size={14} className="animate-spin" />
+                    Carregando mais...
+                  </div>
+                )}
+                {!hasMore && alunos.length > 0 && !loading && (
+                  <p className="text-xs text-gray-300">{alunos.length} de {total} alunos</p>
+                )}
+              </td>
+            </tr>
           </tbody>
         </table>
-      </div>
-
-      {/* Infinite scroll sentinel + loading indicator */}
-      <div ref={sentinelRef} className="px-7 py-4 flex items-center justify-center">
-        {loadingMore && (
-          <div className="flex items-center gap-2 text-sm text-gray-400">
-            <Loader2 size={14} className="animate-spin" />
-            Carregando mais...
-          </div>
-        )}
-        {!hasMore && alunos.length > 0 && !loading && (
-          <p className="text-xs text-gray-300">
-            {alunos.length} de {total} alunos
-          </p>
-        )}
       </div>
 
       {/* Modal de edição */}

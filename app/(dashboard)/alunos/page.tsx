@@ -80,7 +80,13 @@ function Popover({ trigger, children, align = 'left' }: {
 
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      // não fechar se o clique for dentro do painel ou em portals do Radix (Select, etc.)
+      if (ref.current && ref.current.contains(target)) return
+      // portals do Radix ficam em [data-radix-popper-content-wrapper]
+      const inPortal = (target as Element)?.closest?.('[data-radix-popper-content-wrapper], [data-radix-select-viewport]')
+      if (inPortal) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -211,7 +217,7 @@ export default function AlunosPage() {
 
   // ─── filter panel content ──────────────────────────────────────────────────
   const FilterPanel = (
-    <div className="p-4 flex flex-col gap-4" style={{ width: 320 }}>
+    <div className="p-4 flex flex-col gap-4 overflow-y-auto" style={{ width: 320, maxHeight: 'calc(100vh - 120px)' }}>
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filtros</span>
         {activeFiltrosCount > 0 && (

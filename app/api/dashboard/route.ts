@@ -74,6 +74,7 @@ export async function GET(_: NextRequest) {
     analisesDoMes,
     tarefasAtrasadasGrupo,
     membrosAtivos,
+    alunosParaFollowUpStatus,
   ] = await Promise.all([
     // ── Métricas atuais ──────────────────────────────────────
     prisma.aluno.count({ where: { statusAtual: StatusAluno.ATIVO } }),
@@ -204,6 +205,16 @@ export async function GET(_: NextRequest) {
       select: { id: true, nome: true, cargo: true },
       orderBy: { nome: 'asc' },
     }),
+
+    // ── Follow-up status (PRO/ELITE/RETA_FINAL) ──────────────
+    prisma.aluno.findMany({
+      where: {
+        statusAtual: StatusAluno.ATIVO,
+        plano: { in: [Plano.PRO, Plano.ELITE, Plano.RETA_FINAL] },
+      },
+      select: { id: true, nome: true, plano: true, faseAtual: true, dataUltimoFollowUp: true },
+      orderBy: { dataUltimoFollowUp: 'asc' },
+    }),
   ])
 
   // ── Churn risk ──────────────────────────────────────────────────────────────
@@ -292,6 +303,22 @@ export async function GET(_: NextRequest) {
 
   const totalFollowUpsNoMes = followUpsDoMes.length
 
+  // ── Follow-up status buckets ────────────────────────────────────────────────
+  const ha15DiasTs = now.getTime() - 15 * 24 * 60 * 60 * 1000
+  const ha30DiasTs = now.getTime() - 30 * 24 * 60 * 60 * 1000
+  const followUpStatus = {
+    ate15Dias:   [] as typeof alunosParaFollowUpStatus,
+    de15a30Dias: [] as typeof alunosParaFollowUpStatus,
+    mais30Dias:  [] as typeof alunosParaFollowUpStatus,
+  }
+  alunosParaFollowUpStatus.forEach((a) => {
+    if (!a.dataUltimoFollowUp) return followUpStatus.mais30Dias.push(a)
+    const ts = new Date(a.dataUltimoFollowUp).getTime()
+    if (ts >= ha15DiasTs) followUpStatus.ate15Dias.push(a)
+    else if (ts >= ha30DiasTs) followUpStatus.de15a30Dias.push(a)
+    else followUpStatus.mais30Dias.push(a)
+  })
+
   return NextResponse.json({
     cards: {
       totalAtivos,
@@ -320,6 +347,7 @@ export async function GET(_: NextRequest) {
       tarefasEmAndamento,
     },
     produtividadeTime,
+    followUpStatus,
     alertas: {
       followUpsAtrasados,
       vencendoEm15Dias,

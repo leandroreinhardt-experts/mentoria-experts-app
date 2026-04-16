@@ -19,6 +19,7 @@ import {
   PieChart, Pie, Legend,
   ComposedChart, Line, Area,
 } from 'recharts'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 // ─── Cores ───────────────────────────────────────────────────────────────────
 
@@ -110,6 +111,7 @@ export default function DashboardPage() {
   const [data, setData]               = useState<any>(null)
   const [membros, setMembros]         = useState<any[]>([])
   const [filtroResp, setFiltroResp]   = useState('TODOS')
+  const [followUpModal, setFollowUpModal] = useState<{ titulo: string; color: string; alunos: any[] } | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -124,7 +126,7 @@ export default function DashboardPage() {
   if (!data) return <DashboardSkeleton />
 
   const { cards, tendencias, distribuicaoFases, distribuicaoPlanos, historicoMensal,
-          riscoChurn, hoje, produtividadeTime, alertas } = data
+          riscoChurn, hoje, alertas, followUpStatus } = data
 
   const tarefasFiltradas = filtroResp === 'TODOS'
     ? alertas.tarefasAtrasadas
@@ -137,8 +139,6 @@ export default function DashboardPage() {
     return avatarCores[idx % avatarCores.length] ?? 'bg-gray-400'
   }
 
-  const maxProd = Math.max(...(produtividadeTime ?? []).map((m: any) => m.followUps + m.analises), 1)
-
   return (
     <div className="p-7 space-y-7">
 
@@ -149,7 +149,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── C: Seção Hoje ──────────────────────────────────── */}
-      {(hoje.tarefas.length > 0 || hoje.alunosContatar.length > 0) && (
+      {(hoje.tarefas.length > 0 || hoje.tarefasEmAndamento.length > 0) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Tarefas do dia */}
           <div className="bg-white rounded-xl border border-indigo-100 p-4 space-y-3">
@@ -492,67 +492,88 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── F: Produtividade + Alertas ───────────────────────── */}
+      {/* ── F: Status de Follow-up + Alertas ───────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
-        {/* F: Produtividade do time */}
-        <div className="lg:col-span-3 bg-white rounded-xl border border-gray-100 p-5">
+        {/* Follow-up status — donut clicável */}
+        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 p-5">
           <div className="flex items-center gap-2 mb-4">
             <div className="flex h-6 w-6 items-center justify-center rounded-md bg-violet-50">
-              <Users size={13} className="text-violet-500" />
+              <MessageSquare size={13} className="text-violet-500" />
             </div>
-            <h4 className="text-sm font-semibold text-gray-700">Produtividade do time — {new Date().toLocaleDateString('pt-BR', { month: 'long' })}</h4>
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700">Status de Follow-up</h4>
+              <p className="text-[11px] text-gray-400">PRO · ELITE · Reta Final</p>
+            </div>
           </div>
-          {produtividadeTime.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-4">Nenhum membro registrado.</p>
-          ) : (
-            <div className="space-y-3">
-              {produtividadeTime.map((m: any, idx: number) => {
-                const total = m.followUps + m.analises
-                const pct = Math.round((total / maxProd) * 100)
-                return (
-                  <div key={m.id} className="flex items-center gap-3">
-                    <div className={`h-7 w-7 rounded-full ${avatarCores[idx % avatarCores.length]} flex items-center justify-center text-[11px] font-bold text-white shrink-0`}>
-                      {m.nome?.[0]?.toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-semibold text-gray-800 truncate">{m.nome}</span>
-                        <div className="flex items-center gap-2 shrink-0 ml-2 text-[11px] text-gray-500">
-                          <span title="Follow-ups" className="flex items-center gap-0.5">
-                            <MessageSquare size={9} className="text-amber-500" />{m.followUps}
-                          </span>
-                          <span title="Alterações no plano" className="flex items-center gap-0.5">
-                            <Activity size={9} className="text-indigo-500" />{m.analises}
-                          </span>
-                          {m.tarefasAtrasadas > 0 && (
-                            <span title="Tarefas atrasadas" className="flex items-center gap-0.5 text-red-400 font-semibold">
-                              <AlertTriangle size={9} />{m.tarefasAtrasadas}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${avatarCores[idx % avatarCores.length].replace('bg-', 'bg-').replace('-500', '-400')}`}
-                          style={{ width: `${Math.max(pct, 2)}%` }}
-                        />
-                      </div>
-                    </div>
+
+          {followUpStatus && (() => {
+            const total = followUpStatus.ate15Dias.length + followUpStatus.de15a30Dias.length + followUpStatus.mais30Dias.length
+            const segments = [
+              { key: 'ate15Dias',   label: 'Até 15 dias',   sublabel: 'Em dia',    color: '#10b981', bg: 'bg-emerald-500', light: 'bg-emerald-50',  text: 'text-emerald-700', count: followUpStatus.ate15Dias.length,   alunos: followUpStatus.ate15Dias },
+              { key: 'de15a30Dias', label: '15 a 30 dias',  sublabel: 'Atenção',   color: '#f59e0b', bg: 'bg-amber-500',   light: 'bg-amber-50',    text: 'text-amber-700',   count: followUpStatus.de15a30Dias.length, alunos: followUpStatus.de15a30Dias },
+              { key: 'mais30Dias',  label: 'Mais de 30 dias',sublabel: 'Urgente',  color: '#ef4444', bg: 'bg-red-500',     light: 'bg-red-50',      text: 'text-red-700',     count: followUpStatus.mais30Dias.length,  alunos: followUpStatus.mais30Dias },
+            ]
+            return (
+              <>
+                {/* Donut chart */}
+                <div className="flex items-center gap-4 mb-4">
+                  <ResponsiveContainer width={110} height={110}>
+                    <PieChart>
+                      <Pie
+                        data={segments.map((s) => ({ name: s.label, value: s.count || 0.001, color: s.color, key: s.key }))}
+                        dataKey="value"
+                        cx="50%" cy="50%"
+                        innerRadius={30} outerRadius={50}
+                        strokeWidth={2}
+                        stroke="#fff"
+                        onClick={(entry: any) => {
+                          const seg = segments.find((s) => s.key === entry.key)
+                          if (seg) setFollowUpModal({ titulo: `${seg.sublabel} — ${seg.label}`, color: seg.color, alunos: seg.alunos })
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {segments.map((s) => <Cell key={s.key} fill={s.color} />)}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-0.5 text-[11px] text-gray-400 font-medium">
+                    Total
+                    <p className="text-2xl font-bold text-gray-900 leading-none">{total}</p>
+                    alunos
                   </div>
-                )
-              })}
-            </div>
-          )}
-          <p className="text-[10px] text-gray-400 mt-3 flex items-center gap-2">
-            <MessageSquare size={9} /> Follow-ups &nbsp;
-            <Activity size={9} /> Alterações &nbsp;
-            <AlertTriangle size={9} className="text-red-300" /> Tarefas atrasadas
-          </p>
+                </div>
+
+                {/* Legend clicável */}
+                <div className="space-y-2">
+                  {segments.map((s) => {
+                    const pct = total > 0 ? Math.round((s.count / total) * 100) : 0
+                    return (
+                      <button
+                        key={s.key}
+                        onClick={() => setFollowUpModal({ titulo: `${s.sublabel} — ${s.label}`, color: s.color, alunos: s.alunos })}
+                        className={`w-full flex items-center gap-2 p-2 rounded-lg ${s.light} hover:opacity-80 transition-opacity text-left`}
+                      >
+                        <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                        <div className="flex-1 min-w-0">
+                          <span className={`text-xs font-semibold ${s.text}`}>{s.sublabel}</span>
+                          <span className="text-[10px] text-gray-400 ml-1">{s.label}</span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className={`text-xs font-bold ${s.text}`}>{s.count}</span>
+                          <span className="text-[10px] text-gray-400">({pct}%)</span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )
+          })()}
         </div>
 
         {/* Alertas laterais */}
-        <div className="lg:col-span-2 space-y-3">
+        <div className="lg:col-span-3 space-y-3">
           {alertas.followUpsAtrasados.length > 0 && (
             <div className="bg-white rounded-xl border border-orange-100 p-4">
               <div className="flex items-center gap-2 mb-2.5">
@@ -712,6 +733,43 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Modal lista de alunos por status de follow-up */}
+      {followUpModal && (
+        <Dialog open={!!followUpModal} onOpenChange={() => setFollowUpModal(null)}>
+          <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-sm">
+                <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: followUpModal.color }} />
+                {followUpModal.titulo}
+                <span className="text-xs font-normal text-gray-400">({followUpModal.alunos.length})</span>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-1.5 mt-2">
+              {followUpModal.alunos.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">Nenhum aluno nesta categoria.</p>
+              ) : (
+                followUpModal.alunos.map((a: any) => (
+                  <Link
+                    key={a.id}
+                    href={`/alunos/${a.id}`}
+                    onClick={() => setFollowUpModal(null)}
+                    className="flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 border border-gray-100 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{a.nome}</p>
+                      <p className="text-xs text-gray-400">{a.plano}</p>
+                    </div>
+                    <span className="text-xs text-gray-500 shrink-0 ml-3">
+                      {a.dataUltimoFollowUp ? `${daysDiff(a.dataUltimoFollowUp)}d atrás` : 'Nunca'}
+                    </span>
+                  </Link>
+                ))
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
     </div>

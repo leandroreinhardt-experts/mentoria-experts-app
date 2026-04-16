@@ -1,8 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Plus, Search, Download, ChevronLeft, ChevronRight, ShieldAlert, Pencil, EyeOff } from 'lucide-react'
+import {
+  Plus, Search, Download, ChevronLeft, ChevronRight,
+  Pencil, Filter, ArrowUpDown, X, Check, ChevronDown,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { HoverBorderGradient } from '@/components/ui/hover-border-gradient'
 import { EditarAlunoModal } from '@/components/shared/EditarAlunoModal'
@@ -14,6 +17,7 @@ import { riscoConfig, type NivelRisco } from '@/lib/churn-risk'
 import { FaseMentoria, Plano, StatusAluno } from '@prisma/client'
 import { AnimatedBadge } from '@/components/ui/animated-badge'
 
+// ─── configs ─────────────────────────────────────────────────────────────────
 const statusConfig: Record<StatusAluno, { label: string; className: string; glow: string }> = {
   ATIVO:    { label: 'Ativo',    className: 'bg-emerald-50 text-emerald-700 border border-emerald-200', glow: 'rgba(16, 185, 129, 0.9)' },
   APROVADO: { label: 'Aprovado', className: 'bg-indigo-50 text-indigo-700 border border-indigo-200',   glow: 'rgba(99, 102, 241, 0.9)' },
@@ -22,26 +26,108 @@ const statusConfig: Record<StatusAluno, { label: string; className: string; glow
 }
 
 const planoConfig: Record<Plano, { className: string; glow: string }> = {
-  START:      { className: 'bg-gray-50 text-gray-600 border border-gray-200',         glow: 'rgba(156, 163, 175, 0.9)' },
-  PRO:        { className: 'bg-violet-50 text-violet-700 border border-violet-200',   glow: 'rgba(139, 92, 246, 0.9)'  },
-  ELITE:      { className: 'bg-amber-50 text-amber-700 border border-amber-200',      glow: 'rgba(245, 158, 11, 0.9)'  },
+  START:      { className: 'bg-gray-50 text-gray-600 border border-gray-200',          glow: 'rgba(156, 163, 175, 0.9)' },
+  PRO:        { className: 'bg-violet-50 text-violet-700 border border-violet-200',    glow: 'rgba(139, 92, 246, 0.9)'  },
+  ELITE:      { className: 'bg-amber-50 text-amber-700 border border-amber-200',       glow: 'rgba(245, 158, 11, 0.9)'  },
   RETA_FINAL: { className: 'bg-emerald-50 text-emerald-700 border border-emerald-200', glow: 'rgba(16, 185, 129, 0.9)'  },
 }
 
+// ─── sort options ─────────────────────────────────────────────────────────────
+type SortKey =
+  | 'criadoEm'
+  | 'nome'
+  | 'plano'
+  | 'dataEntrada'
+  | 'dataVencimento'
+  | 'followUpRecente'
+  | 'followUpAntigo'
+  | 'riscoChurn'
+
+interface SortOption { key: SortKey; label: string; icon?: string }
+
+const SORT_OPTIONS: SortOption[] = [
+  { key: 'criadoEm',         label: 'Mais recentes primeiro' },
+  { key: 'nome',             label: 'Ordem alfabética' },
+  { key: 'plano',            label: 'Plano' },
+  { key: 'dataEntrada',      label: 'Data de entrada' },
+  { key: 'dataVencimento',   label: 'Data de vencimento' },
+  { key: 'followUpRecente',  label: 'Follow-up mais recente' },
+  { key: 'followUpAntigo',   label: 'Follow-up mais antigo' },
+  { key: 'riscoChurn',       label: 'Risco de churn' },
+]
+
+function sortKeyToApiParams(key: SortKey): { sortBy: string; sortDir: 'asc' | 'desc' } {
+  switch (key) {
+    case 'nome':            return { sortBy: 'nome',               sortDir: 'asc'  }
+    case 'plano':           return { sortBy: 'plano',              sortDir: 'asc'  }
+    case 'dataEntrada':     return { sortBy: 'dataEntrada',        sortDir: 'asc'  }
+    case 'dataVencimento':  return { sortBy: 'dataVencimento',     sortDir: 'asc'  }
+    case 'followUpRecente': return { sortBy: 'dataUltimoFollowUp', sortDir: 'desc' }
+    case 'followUpAntigo':  return { sortBy: 'dataUltimoFollowUp', sortDir: 'asc'  }
+    case 'riscoChurn':      return { sortBy: 'riscoChurn',         sortDir: 'desc' }
+    default:                return { sortBy: 'criadoEm',           sortDir: 'desc' }
+  }
+}
+
+// ─── tiny Popover primitive ───────────────────────────────────────────────────
+function Popover({ trigger, children, align = 'left' }: {
+  trigger: React.ReactNode
+  children: React.ReactNode
+  align?: 'left' | 'right'
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <div onClick={() => setOpen(v => !v)}>{trigger}</div>
+      {open && (
+        <div
+          className={`absolute top-full mt-1.5 z-50 bg-white border border-gray-200 rounded-xl shadow-lg ${
+            align === 'right' ? 'right-0' : 'left-0'
+          }`}
+          style={{ minWidth: 240 }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── main page ────────────────────────────────────────────────────────────────
 export default function AlunosPage() {
-  const [alunos, setAlunos] = useState<any[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [search, setSearch] = useState('')
-  const [fase, setFase] = useState('')
-  const [plano, setPlano] = useState('')
-  const [status, setStatus] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [alunos, setAlunos]         = useState<any[]>([])
+  const [total, setTotal]           = useState(0)
+  const [page, setPage]             = useState(1)
+  const [search, setSearch]         = useState('')
+  const [fase, setFase]             = useState('')
+  const [plano, setPlano]           = useState('')
+  const [status, setStatus]         = useState('')
+  const [loading, setLoading]       = useState(true)
   const [editarAluno, setEditarAluno] = useState<any | null>(null)
   const [mostrarChurn, setMostrarChurn] = useState(false)
-  const [concursoTag, setConcursoTag] = useState('')
+  const [concursoTag, setConcursoTag]   = useState('')
   const [areaEstudoTag, setAreaEstudoTag] = useState('')
   const [tagOptions, setTagOptions] = useState<{ concursos: string[]; areasEstudo: string[] }>({ concursos: [], areasEstudo: [] })
+
+  // date range filters
+  const [dataEntradaInicio,    setDataEntradaInicio]    = useState('')
+  const [dataEntradaFim,       setDataEntradaFim]       = useState('')
+  const [dataVencimentoInicio, setDataVencimentoInicio] = useState('')
+  const [dataVencimentoFim,    setDataVencimentoFim]    = useState('')
+
+  // sort
+  const [sortKey, setSortKey] = useState<SortKey>('criadoEm')
+
   const limit = 20
 
   useEffect(() => {
@@ -50,20 +136,47 @@ export default function AlunosPage() {
 
   const fetchAlunos = useCallback(async () => {
     setLoading(true)
+
+    const { sortBy, sortDir } = sortKeyToApiParams(sortKey)
+    // riscoChurn is a computed field – sort client-side after fetch
+    const serverSortBy  = sortKey === 'riscoChurn' ? 'criadoEm' : sortBy
+    const serverSortDir = sortKey === 'riscoChurn' ? 'desc'      : sortDir
+
     const params = new URLSearchParams({
       page: String(page), limit: String(limit),
-      ...(search && { search }), ...(fase && { fase }),
-      ...(plano && { plano }), ...(status && { status }),
+      ...(search              && { search }),
+      ...(fase                && { fase }),
+      ...(plano               && { plano }),
+      ...(status              && { status }),
       ...(!mostrarChurn && !status ? { excludeChurn: 'true' } : {}),
-      ...(concursoTag    && { concurso:    concursoTag }),
-      ...(areaEstudoTag  && { areaEstudo:  areaEstudoTag }),
+      ...(concursoTag         && { concurso:    concursoTag }),
+      ...(areaEstudoTag       && { areaEstudo:  areaEstudoTag }),
+      ...(dataEntradaInicio   && { dataEntradaInicio }),
+      ...(dataEntradaFim      && { dataEntradaFim }),
+      ...(dataVencimentoInicio && { dataVencimentoInicio }),
+      ...(dataVencimentoFim   && { dataVencimentoFim }),
+      sortBy:  serverSortBy,
+      sortDir: serverSortDir,
     })
-    const res = await fetch(`/api/alunos?${params}`)
+
+    const res  = await fetch(`/api/alunos?${params}`)
     const data = await res.json()
-    setAlunos(data.alunos || [])
+    let lista: any[] = data.alunos || []
+
+    // client-side risco churn sort
+    if (sortKey === 'riscoChurn') {
+      lista = [...lista].sort((a, b) => {
+        const sa = a.riscoChurn?.score ?? 0
+        const sb = b.riscoChurn?.score ?? 0
+        return sb - sa
+      })
+    }
+
+    setAlunos(lista)
     setTotal(data.total || 0)
     setLoading(false)
-  }, [page, search, fase, plano, status, mostrarChurn, concursoTag, areaEstudoTag])
+  }, [page, search, fase, plano, status, mostrarChurn, concursoTag, areaEstudoTag,
+      sortKey, dataEntradaInicio, dataEntradaFim, dataVencimentoInicio, dataVencimentoFim])
 
   useEffect(() => { fetchAlunos() }, [fetchAlunos])
 
@@ -79,7 +192,198 @@ export default function AlunosPage() {
     const a = document.createElement('a'); a.href = url; a.download = 'alunos.csv'; a.click()
   }
 
+  function resetFiltros() {
+    setFase(''); setPlano(''); setStatus(''); setConcursoTag(''); setAreaEstudoTag('')
+    setMostrarChurn(false)
+    setDataEntradaInicio(''); setDataEntradaFim('')
+    setDataVencimentoInicio(''); setDataVencimentoFim('')
+    setPage(1)
+  }
+
+  const activeFiltrosCount = [
+    fase, plano, status, concursoTag, areaEstudoTag,
+    dataEntradaInicio || dataEntradaFim,
+    dataVencimentoInicio || dataVencimentoFim,
+    mostrarChurn ? 'churn' : '',
+  ].filter(Boolean).length
+
   const totalPages = Math.ceil(total / limit)
+
+  // ─── filter panel content ──────────────────────────────────────────────────
+  const FilterPanel = (
+    <div className="p-4 flex flex-col gap-4" style={{ width: 320 }}>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filtros</span>
+        {activeFiltrosCount > 0 && (
+          <button onClick={resetFiltros} className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-red-500 transition-colors">
+            <X size={11} /> Limpar tudo
+          </button>
+        )}
+      </div>
+
+      {/* Fase */}
+      <div>
+        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1 block">Fase</label>
+        <Select value={fase || '_all'} onValueChange={(v) => { setFase(v === '_all' ? '' : v); setPage(1) }}>
+          <SelectTrigger className="h-8 text-sm border-gray-200">
+            <SelectValue placeholder="Todas as fases" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">Todas as fases</SelectItem>
+            <SelectItem value="ONBOARDING">Onboarding</SelectItem>
+            <SelectItem value="PRE_EDITAL">Pré-edital</SelectItem>
+            <SelectItem value="POS_EDITAL">Pós-edital</SelectItem>
+            <SelectItem value="PROXIMO_VENCIMENTO">Próx. vencimento</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Plano */}
+      <div>
+        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1 block">Plano</label>
+        <Select value={plano || '_all'} onValueChange={(v) => { setPlano(v === '_all' ? '' : v); setPage(1) }}>
+          <SelectTrigger className="h-8 text-sm border-gray-200">
+            <SelectValue placeholder="Todos os planos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">Todos os planos</SelectItem>
+            <SelectItem value="START">START</SelectItem>
+            <SelectItem value="PRO">PRO</SelectItem>
+            <SelectItem value="ELITE">ELITE</SelectItem>
+            <SelectItem value="RETA_FINAL">Reta Final TJSC</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Status */}
+      <div>
+        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1 block">Status</label>
+        <Select value={status || '_all'} onValueChange={(v) => { setStatus(v === '_all' ? '' : v); setPage(1) }}>
+          <SelectTrigger className="h-8 text-sm border-gray-200">
+            <SelectValue placeholder="Todos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">Todos</SelectItem>
+            <SelectItem value="ATIVO">Ativo</SelectItem>
+            <SelectItem value="APROVADO">Aprovado</SelectItem>
+            <SelectItem value="CHURN">Churn</SelectItem>
+            <SelectItem value="INATIVO">Inativo</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Concurso */}
+      <div>
+        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1 block">Concurso / Cargo</label>
+        <Select value={concursoTag || '_all'} onValueChange={(v) => { setConcursoTag(v === '_all' ? '' : v); setPage(1) }}>
+          <SelectTrigger className="h-8 text-sm border-gray-200">
+            <SelectValue placeholder="Todos os concursos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">Todos os concursos</SelectItem>
+            {tagOptions.concursos.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Área de estudo */}
+      <div>
+        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1 block">Área de estudo</label>
+        <Select value={areaEstudoTag || '_all'} onValueChange={(v) => { setAreaEstudoTag(v === '_all' ? '' : v); setPage(1) }}>
+          <SelectTrigger className="h-8 text-sm border-gray-200">
+            <SelectValue placeholder="Todas as áreas" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">Todas as áreas</SelectItem>
+            {tagOptions.areasEstudo.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Data de entrada */}
+      <div>
+        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1 block">Período de entrada</label>
+        <div className="flex gap-2">
+          <input
+            type="date"
+            value={dataEntradaInicio}
+            onChange={(e) => { setDataEntradaInicio(e.target.value); setPage(1) }}
+            className="flex-1 h-8 px-2 text-sm border border-gray-200 rounded-md bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+            placeholder="De"
+          />
+          <input
+            type="date"
+            value={dataEntradaFim}
+            onChange={(e) => { setDataEntradaFim(e.target.value); setPage(1) }}
+            className="flex-1 h-8 px-2 text-sm border border-gray-200 rounded-md bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+            placeholder="Até"
+          />
+        </div>
+      </div>
+
+      {/* Data de vencimento */}
+      <div>
+        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1 block">Período de vencimento</label>
+        <div className="flex gap-2">
+          <input
+            type="date"
+            value={dataVencimentoInicio}
+            onChange={(e) => { setDataVencimentoInicio(e.target.value); setPage(1) }}
+            className="flex-1 h-8 px-2 text-sm border border-gray-200 rounded-md bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+          />
+          <input
+            type="date"
+            value={dataVencimentoFim}
+            onChange={(e) => { setDataVencimentoFim(e.target.value); setPage(1) }}
+            className="flex-1 h-8 px-2 text-sm border border-gray-200 rounded-md bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+          />
+        </div>
+      </div>
+
+      {/* Mostrar churns */}
+      <div>
+        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1 block">Alunos em churn</label>
+        <button
+          onClick={() => { setMostrarChurn(v => !v); setPage(1) }}
+          className={`flex items-center gap-2 h-8 w-full px-3 rounded-md border text-sm font-medium transition-colors ${
+            mostrarChurn
+              ? 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
+              : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+            mostrarChurn ? 'bg-red-500 border-red-500' : 'border-gray-300'
+          }`}>
+            {mostrarChurn && <Check size={10} className="text-white" />}
+          </div>
+          Exibir alunos em churn
+        </button>
+      </div>
+    </div>
+  )
+
+  // ─── sort panel content ────────────────────────────────────────────────────
+  const SortPanel = (
+    <div className="py-2" style={{ width: 240 }}>
+      <div className="px-3 pb-2 mb-1 border-b border-gray-100">
+        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Ordenação</span>
+      </div>
+      {SORT_OPTIONS.map((opt) => (
+        <button
+          key={opt.key}
+          onClick={() => { setSortKey(opt.key); setPage(1) }}
+          className={`flex items-center justify-between w-full px-3 py-2 text-sm transition-colors ${
+            sortKey === opt.key
+              ? 'bg-indigo-50 text-indigo-700 font-medium'
+              : 'text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          {opt.label}
+          {sortKey === opt.key && <Check size={14} className="text-indigo-500 flex-shrink-0" />}
+        </button>
+      ))}
+    </div>
+  )
 
   return (
     <div className="flex flex-col h-full">
@@ -101,8 +405,9 @@ export default function AlunosPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 px-7 py-3 border-b border-gray-100 bg-white">
+      {/* Search + action bar */}
+      <div className="flex flex-wrap items-center gap-2 px-7 py-3 border-b border-gray-100 bg-white">
+        {/* Search */}
         <div className="relative flex-1 min-w-[220px] max-w-xs">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <Input
@@ -112,80 +417,91 @@ export default function AlunosPage() {
             className="pl-8 h-8 text-sm border-gray-200 bg-gray-50 focus:bg-white"
           />
         </div>
-        <Select value={fase} onValueChange={(v) => { setFase(v === '_all' ? '' : v); setPage(1) }}>
-          <SelectTrigger className="w-40 h-8 text-sm border-gray-200">
-            <SelectValue placeholder="Fase" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all">Todas as fases</SelectItem>
-            <SelectItem value="ONBOARDING">Onboarding</SelectItem>
-            <SelectItem value="PRE_EDITAL">Pré-edital</SelectItem>
-            <SelectItem value="POS_EDITAL">Pós-edital</SelectItem>
-            <SelectItem value="PROXIMO_VENCIMENTO">Próx. vencimento</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={plano} onValueChange={(v) => { setPlano(v === '_all' ? '' : v); setPage(1) }}>
-          <SelectTrigger className="w-32 h-8 text-sm border-gray-200">
-            <SelectValue placeholder="Plano" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all">Todos os planos</SelectItem>
-            <SelectItem value="START">START</SelectItem>
-            <SelectItem value="PRO">PRO</SelectItem>
-            <SelectItem value="ELITE">ELITE</SelectItem>
-            <SelectItem value="RETA_FINAL">Reta Final TJSC</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={status} onValueChange={(v) => { setStatus(v === '_all' ? '' : v); setPage(1) }}>
-          <SelectTrigger className="w-32 h-8 text-sm border-gray-200">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all">Todos</SelectItem>
-            <SelectItem value="ATIVO">Ativo</SelectItem>
-            <SelectItem value="APROVADO">Aprovado</SelectItem>
-            <SelectItem value="CHURN">Churn</SelectItem>
-            <SelectItem value="INATIVO">Inativo</SelectItem>
-          </SelectContent>
-        </Select>
 
-        <Select value={concursoTag || '_all'} onValueChange={(v) => { setConcursoTag(v === '_all' ? '' : v); setPage(1) }}>
-          <SelectTrigger className="w-48 h-8 text-sm border-gray-200">
-            <SelectValue placeholder="Concurso / Cargo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all">Todos os concursos</SelectItem>
-            {tagOptions.concursos.map((c) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2 ml-auto">
+          {/* Filtros */}
+          <Popover
+            align="right"
+            trigger={
+              <button className={`flex items-center gap-1.5 h-8 px-3 rounded-md border text-[13px] font-medium transition-colors ${
+                activeFiltrosCount > 0
+                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                  : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}>
+                <Filter size={13} />
+                Filtros
+                {activeFiltrosCount > 0 && (
+                  <span className="flex items-center justify-center w-4 h-4 rounded-full bg-indigo-500 text-white text-[10px] font-bold leading-none">
+                    {activeFiltrosCount}
+                  </span>
+                )}
+                <ChevronDown size={12} className="text-gray-400" />
+              </button>
+            }
+          >
+            {FilterPanel}
+          </Popover>
 
-        <Select value={areaEstudoTag || '_all'} onValueChange={(v) => { setAreaEstudoTag(v === '_all' ? '' : v); setPage(1) }}>
-          <SelectTrigger className="w-44 h-8 text-sm border-gray-200">
-            <SelectValue placeholder="Área de estudo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all">Todas as áreas</SelectItem>
-            {tagOptions.areasEstudo.map((a) => (
-              <SelectItem key={a} value={a}>{a}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <button
-          onClick={() => { setMostrarChurn((v) => !v); setPage(1) }}
-          className={`flex items-center gap-1.5 h-8 px-3 rounded-md border text-[12px] font-medium transition-colors ${
-            mostrarChurn
-              ? 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
-              : 'bg-white border-gray-200 text-gray-400 hover:bg-gray-50 hover:text-gray-600'
-          }`}
-          title={mostrarChurn ? 'Ocultar alunos em churn' : 'Exibir alunos em churn'}
-        >
-          <EyeOff size={13} />
-          Churns {mostrarChurn ? 'visíveis' : 'ocultos'}
-        </button>
+          {/* Ordenação */}
+          <Popover
+            align="right"
+            trigger={
+              <button className={`flex items-center gap-1.5 h-8 px-3 rounded-md border text-[13px] font-medium transition-colors ${
+                sortKey !== 'criadoEm'
+                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                  : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}>
+                <ArrowUpDown size={13} />
+                Ordenação
+                {sortKey !== 'criadoEm' && (
+                  <span className="text-[11px] text-indigo-500 font-semibold truncate max-w-[100px]">
+                    · {SORT_OPTIONS.find(o => o.key === sortKey)?.label}
+                  </span>
+                )}
+                <ChevronDown size={12} className="text-gray-400" />
+              </button>
+            }
+          >
+            {SortPanel}
+          </Popover>
+        </div>
       </div>
+
+      {/* Active filter chips */}
+      {activeFiltrosCount > 0 && (
+        <div className="flex flex-wrap gap-1.5 px-7 py-2 border-b border-gray-100 bg-gray-50/50">
+          {fase && (
+            <Chip label={`Fase: ${fase.replace('_', ' ')}`} onRemove={() => { setFase(''); setPage(1) }} />
+          )}
+          {plano && (
+            <Chip label={`Plano: ${plano}`} onRemove={() => { setPlano(''); setPage(1) }} />
+          )}
+          {status && (
+            <Chip label={`Status: ${statusConfig[status as StatusAluno]?.label || status}`} onRemove={() => { setStatus(''); setPage(1) }} />
+          )}
+          {concursoTag && (
+            <Chip label={`Concurso: ${concursoTag}`} onRemove={() => { setConcursoTag(''); setPage(1) }} />
+          )}
+          {areaEstudoTag && (
+            <Chip label={`Área: ${areaEstudoTag}`} onRemove={() => { setAreaEstudoTag(''); setPage(1) }} />
+          )}
+          {(dataEntradaInicio || dataEntradaFim) && (
+            <Chip
+              label={`Entrada: ${dataEntradaInicio || '…'} → ${dataEntradaFim || '…'}`}
+              onRemove={() => { setDataEntradaInicio(''); setDataEntradaFim(''); setPage(1) }}
+            />
+          )}
+          {(dataVencimentoInicio || dataVencimentoFim) && (
+            <Chip
+              label={`Vencimento: ${dataVencimentoInicio || '…'} → ${dataVencimentoFim || '…'}`}
+              onRemove={() => { setDataVencimentoInicio(''); setDataVencimentoFim(''); setPage(1) }}
+            />
+          )}
+          {mostrarChurn && (
+            <Chip label="Inclui churns" onRemove={() => { setMostrarChurn(false); setPage(1) }} />
+          )}
+        </div>
+      )}
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
@@ -206,7 +522,7 @@ export default function AlunosPage() {
           <tbody className="bg-white divide-y divide-gray-50">
             {loading ? (
               <tr>
-                <td colSpan={7} className="text-center py-16">
+                <td colSpan={9} className="text-center py-16">
                   <div className="flex flex-col items-center gap-2">
                     <div className="h-6 w-6 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
                     <p className="text-sm text-gray-400">Carregando...</p>
@@ -215,7 +531,7 @@ export default function AlunosPage() {
               </tr>
             ) : alunos.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-16 text-sm text-gray-400">
+                <td colSpan={9} className="text-center py-16 text-sm text-gray-400">
                   Nenhum aluno encontrado
                 </td>
               </tr>
@@ -317,5 +633,17 @@ export default function AlunosPage() {
         />
       )}
     </div>
+  )
+}
+
+// ─── Chip component ───────────────────────────────────────────────────────────
+function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-[11px] font-medium">
+      {label}
+      <button onClick={onRemove} className="hover:text-indigo-900 transition-colors">
+        <X size={10} />
+      </button>
+    </span>
   )
 }

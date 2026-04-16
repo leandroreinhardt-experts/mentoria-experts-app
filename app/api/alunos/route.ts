@@ -21,6 +21,12 @@ export async function GET(req: NextRequest) {
   const excludeChurn = searchParams.get('excludeChurn') === 'true'
   const concursoTag  = searchParams.get('concurso') || ''
   const areaEstudoTag = searchParams.get('areaEstudo') || ''
+  const sortBy  = searchParams.get('sortBy')  || 'criadoEm'
+  const sortDir = (searchParams.get('sortDir') || 'desc') as 'asc' | 'desc'
+  const dataEntradaInicio    = searchParams.get('dataEntradaInicio')    || ''
+  const dataEntradaFim       = searchParams.get('dataEntradaFim')       || ''
+  const dataVencimentoInicio = searchParams.get('dataVencimentoInicio') || ''
+  const dataVencimentoFim    = searchParams.get('dataVencimentoFim')    || ''
 
   const where: any = {}
   if (search) {
@@ -40,6 +46,27 @@ export async function GET(req: NextRequest) {
   if (concursoTag)   where.concursos  = { has: concursoTag }
   if (areaEstudoTag) where.areasEstudo = { has: areaEstudoTag }
 
+  if (dataEntradaInicio || dataEntradaFim) {
+    where.dataEntrada = {}
+    if (dataEntradaInicio) where.dataEntrada.gte = new Date(dataEntradaInicio)
+    if (dataEntradaFim)    where.dataEntrada.lte = new Date(dataEntradaFim + 'T23:59:59.999Z')
+  }
+  if (dataVencimentoInicio || dataVencimentoFim) {
+    where.dataVencimento = {}
+    if (dataVencimentoInicio) where.dataVencimento.gte = new Date(dataVencimentoInicio)
+    if (dataVencimentoFim)    where.dataVencimento.lte = new Date(dataVencimentoFim + 'T23:59:59.999Z')
+  }
+
+  const allowedSortFields: Record<string, any> = {
+    nome:               { nome: sortDir },
+    plano:              { plano: sortDir },
+    dataEntrada:        { dataEntrada: sortDir },
+    dataVencimento:     { dataVencimento: sortDir },
+    dataUltimoFollowUp: { dataUltimoFollowUp: { sort: sortDir, nulls: sortDir === 'asc' ? 'last' : 'first' } },
+    criadoEm:           { criadoEm: sortDir },
+  }
+  const orderBy = allowedSortFields[sortBy] ?? { criadoEm: 'desc' }
+
   const now = new Date()
 
   const [total, alunosRaw] = await Promise.all([
@@ -48,7 +75,7 @@ export async function GET(req: NextRequest) {
       where,
       skip: (page - 1) * limit,
       take: limit,
-      orderBy: { criadoEm: 'desc' },
+      orderBy,
       select: {
         id: true,
         nome: true,

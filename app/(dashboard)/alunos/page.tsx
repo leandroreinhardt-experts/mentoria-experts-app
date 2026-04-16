@@ -545,7 +545,7 @@ export default function AlunosPage() {
       {/* Table */}
       <div ref={scrollContainerRef} className="flex-1 overflow-auto">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-gray-50 border-b border-gray-100 z-10">
+          <thead className="sticky top-0 bg-gray-50 border-b border-gray-100" style={{ zIndex: 40, isolation: 'isolate' }}>
             <tr>
               <th className="text-left px-7 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Nome</th>
               <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Plano</th>
@@ -578,7 +578,7 @@ export default function AlunosPage() {
               </tr>
             ) : (
               alunos.map((aluno) => (
-                <tr key={aluno.id} className="hover:bg-gray-50/80 transition-colors group">
+                <tr key={aluno.id} className="hover:bg-gray-50/80 transition-colors group" style={{ position: 'relative', zIndex: 0, isolation: 'isolate' }}>
                   <td className="px-7 py-3">
                     <Link href={`/alunos/${aluno.id}`} className="font-medium text-gray-900 group-hover:text-indigo-600 transition-colors">
                       {aluno.nome}

@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, User, Plus, Pencil, X, ExternalLink, Clock, CheckCircle2, Circle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, User, Plus, Pencil, X, ExternalLink, Clock, CheckCircle2, Circle, CircleDotDashed } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { UrgenciaBadge, urgenciaCores } from '@/components/shared/UrgenciaBadge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -32,6 +32,18 @@ const avatarCores = [
 
 const urgenciaLabel: Record<UrgenciaTarefa, string> = {
   BAIXA: 'Baixa', MEDIA: 'Média', ALTA: 'Alta', CRITICA: 'Crítica',
+}
+
+const STATUS_MAP: Record<string, { icon: React.ReactNode; label: string; title: string }> = {
+  A_FAZER:      { icon: <Circle size={16} className="text-gray-400" />,           label: 'A fazer',       title: 'Marcar como Em andamento' },
+  EM_ANDAMENTO: { icon: <CircleDotDashed size={16} className="text-indigo-500" />, label: 'Em andamento',  title: 'Marcar como Concluída' },
+  CONCLUIDA:    { icon: <CheckCircle2 size={16} className="text-emerald-500" />,   label: 'Concluída',     title: 'Voltar para A fazer' },
+}
+
+const NEXT_STATUS: Record<string, string> = {
+  A_FAZER: 'EM_ANDAMENTO',
+  EM_ANDAMENTO: 'CONCLUIDA',
+  CONCLUIDA: 'A_FAZER',
 }
 
 export default function CalendarioPage() {
@@ -133,6 +145,20 @@ export default function CalendarioPage() {
   }
 
   function isConcluida(t: any) { return t.status === 'CONCLUIDA' }
+
+  async function ciclicaStatus(id: string, currentStatus: string) {
+    const novoStatus = NEXT_STATUS[currentStatus] ?? 'EM_ANDAMENTO'
+    // Atualiza otimisticamente no estado local
+    setTarefas(prev => prev.map(t => t.id === id ? { ...t, status: novoStatus } : t))
+    fetch(`/api/tarefas/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: novoStatus }),
+    }).catch(() => {
+      // Reverte em caso de erro
+      setTarefas(prev => prev.map(t => t.id === id ? { ...t, status: currentStatus } : t))
+    })
+  }
 
   function getDaysInMonth(year: number, month: number) {
     return new Date(year, month + 1, 0).getDate()
@@ -273,12 +299,18 @@ export default function CalendarioPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 mb-1">
-                            <Circle size={12} className="text-gray-400 flex-shrink-0" />
+                            <button
+                              onClick={() => ciclicaStatus(t.id, t.status)}
+                              title={(STATUS_MAP[t.status] ?? STATUS_MAP.A_FAZER).title}
+                              className="flex-shrink-0 hover:scale-110 active:scale-90 transition-transform"
+                            >
+                              {(STATUS_MAP[t.status] ?? STATUS_MAP.A_FAZER).icon}
+                            </button>
                             <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
                               {urgenciaLabel[t.urgencia as UrgenciaTarefa]}
                             </span>
                           </div>
-                          <p className="text-sm font-semibold text-gray-800 leading-snug">{t.titulo}</p>
+                          <p className={`text-sm font-semibold leading-snug ${t.status === 'CONCLUIDA' ? 'line-through text-gray-400' : 'text-gray-800'}`}>{t.titulo}</p>
                           {t.descricao && (
                             <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{t.descricao}</p>
                           )}

@@ -39,7 +39,14 @@ export default function AlunosPage() {
   const [loading, setLoading] = useState(true)
   const [editarAluno, setEditarAluno] = useState<any | null>(null)
   const [mostrarChurn, setMostrarChurn] = useState(false)
+  const [concursoTag, setConcursoTag] = useState('')
+  const [areaEstudoTag, setAreaEstudoTag] = useState('')
+  const [tagOptions, setTagOptions] = useState<{ concursos: string[]; areasEstudo: string[] }>({ concursos: [], areasEstudo: [] })
   const limit = 20
+
+  useEffect(() => {
+    fetch('/api/alunos/tags').then(r => r.json()).then(setTagOptions).catch(() => {})
+  }, [])
 
   const fetchAlunos = useCallback(async () => {
     setLoading(true)
@@ -48,13 +55,15 @@ export default function AlunosPage() {
       ...(search && { search }), ...(fase && { fase }),
       ...(plano && { plano }), ...(status && { status }),
       ...(!mostrarChurn && !status ? { excludeChurn: 'true' } : {}),
+      ...(concursoTag    && { concurso:    concursoTag }),
+      ...(areaEstudoTag  && { areaEstudo:  areaEstudoTag }),
     })
     const res = await fetch(`/api/alunos?${params}`)
     const data = await res.json()
     setAlunos(data.alunos || [])
     setTotal(data.total || 0)
     setLoading(false)
-  }, [page, search, fase, plano, status, mostrarChurn])
+  }, [page, search, fase, plano, status, mostrarChurn, concursoTag, areaEstudoTag])
 
   useEffect(() => { fetchAlunos() }, [fetchAlunos])
 
@@ -137,6 +146,30 @@ export default function AlunosPage() {
             <SelectItem value="APROVADO">Aprovado</SelectItem>
             <SelectItem value="CHURN">Churn</SelectItem>
             <SelectItem value="INATIVO">Inativo</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={concursoTag || '_all'} onValueChange={(v) => { setConcursoTag(v === '_all' ? '' : v); setPage(1) }}>
+          <SelectTrigger className="w-48 h-8 text-sm border-gray-200">
+            <SelectValue placeholder="Concurso / Cargo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">Todos os concursos</SelectItem>
+            {tagOptions.concursos.map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={areaEstudoTag || '_all'} onValueChange={(v) => { setAreaEstudoTag(v === '_all' ? '' : v); setPage(1) }}>
+          <SelectTrigger className="w-44 h-8 text-sm border-gray-200">
+            <SelectValue placeholder="Área de estudo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">Todas as áreas</SelectItem>
+            {tagOptions.areasEstudo.map((a) => (
+              <SelectItem key={a} value={a}>{a}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
 

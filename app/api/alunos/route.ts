@@ -19,6 +19,8 @@ export async function GET(req: NextRequest) {
   const plano = searchParams.get('plano') || ''
   const status = searchParams.get('status') || ''
   const excludeChurn = searchParams.get('excludeChurn') === 'true'
+  const concursoTag  = searchParams.get('concurso') || ''
+  const areaEstudoTag = searchParams.get('areaEstudo') || ''
 
   const where: any = {}
   if (search) {
@@ -35,6 +37,8 @@ export async function GET(req: NextRequest) {
   } else if (excludeChurn) {
     where.statusAtual = { not: 'CHURN' }
   }
+  if (concursoTag)   where.concursos  = { has: concursoTag }
+  if (areaEstudoTag) where.areasEstudo = { has: areaEstudoTag }
 
   const now = new Date()
 
@@ -62,6 +66,8 @@ export async function GET(req: NextRequest) {
         faseManualOverride: true,
         cursoPrincipal: true,
         areaEstudo: true,
+        concursos: true,
+        areasEstudo: true,
         responsavelAcomp: { select: { id: true, nome: true } },
         _count: {
           select: {

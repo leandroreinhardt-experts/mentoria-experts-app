@@ -465,10 +465,15 @@ export default function AlunoPerfilPage() {
                   <button onClick={() => setEditingAreaEstudo(false)} className="text-gray-400 hover:text-gray-600"><X size={13} /></button>
                 </div>
               ) : (
-                <div className="flex items-center gap-1 group">
-                  <GraduationCap size={13} className="text-gray-400 shrink-0" />
-                  <span className="text-sm text-gray-800 flex-1">{aluno.areaEstudo || <span className="italic text-gray-300 text-xs">Não definida</span>}</span>
-                  <button onClick={() => { setAreaEstudoInput(aluno.areaEstudo || ''); setEditingAreaEstudo(true) }} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-indigo-500 transition-opacity">
+                <div className="flex items-start gap-1 group">
+                  <GraduationCap size={13} className="text-gray-400 shrink-0 mt-0.5" />
+                  <div className="flex flex-wrap gap-1 flex-1">
+                    {(aluno.areasEstudo?.length > 0 ? aluno.areasEstudo : aluno.areaEstudo ? [aluno.areaEstudo] : []).map((t: string) => (
+                      <span key={t} className="inline-flex items-center bg-indigo-50 text-indigo-700 rounded-md px-2 py-0.5 text-xs font-medium">{t}</span>
+                    ))}
+                    {!aluno.areasEstudo?.length && !aluno.areaEstudo && <span className="italic text-gray-300 text-xs">Não definida</span>}
+                  </div>
+                  <button onClick={() => { setAreaEstudoInput(aluno.areaEstudo || ''); setEditingAreaEstudo(true) }} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-indigo-500 transition-opacity shrink-0">
                     <Edit size={12} />
                   </button>
                 </div>
@@ -478,18 +483,21 @@ export default function AlunoPerfilPage() {
             {/* Concurso */}
             <div>
               <p className="text-[10px] text-gray-400 mb-0.5">Concurso</p>
-              <div className="flex items-center gap-1.5 text-sm">
-                <Target size={13} className="text-gray-400 shrink-0" />
-                <span className="text-gray-800">
-                  {(() => {
-                    const resp = Array.isArray(aluno.onboardingRespostas)
-                      ? (aluno.onboardingRespostas as { pergunta: string; resposta: string }[]).find(
-                          r => r.pergunta === 'Qual concurso almejado?' || r.pergunta === 'Concurso / Cargo'
-                        )?.resposta
-                      : null
-                    return resp || aluno.areaEstudo || <span className="italic text-gray-300 text-xs">Não informado</span>
-                  })()}
-                </span>
+              <div className="flex items-start gap-1.5">
+                <Target size={13} className="text-gray-400 shrink-0 mt-0.5" />
+                <div className="flex flex-wrap gap-1">
+                  {(aluno.concursos?.length > 0
+                    ? aluno.concursos
+                    : aluno.onboardingRespostas?.find((r: any) => r.pergunta === 'Qual concurso almejado?' || r.pergunta === 'Concurso / Cargo')?.resposta
+                      ? [aluno.onboardingRespostas.find((r: any) => r.pergunta === 'Qual concurso almejado?' || r.pergunta === 'Concurso / Cargo').resposta]
+                      : []
+                  ).map((t: string) => (
+                    <span key={t} className="inline-flex items-center bg-emerald-50 text-emerald-700 rounded-md px-2 py-0.5 text-xs font-medium">{t}</span>
+                  ))}
+                  {!aluno.concursos?.length && !aluno.onboardingRespostas?.find((r: any) => r.pergunta === 'Qual concurso almejado?' || r.pergunta === 'Concurso / Cargo')?.resposta && (
+                    <span className="italic text-gray-300 text-xs">Não informado</span>
+                  )}
+                </div>
               </div>
             </div>
 

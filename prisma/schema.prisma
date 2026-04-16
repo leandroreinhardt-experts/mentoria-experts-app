@@ -127,6 +127,8 @@ model Aluno {
   cursoPrincipal        String?
   plataformaQuestoes    String?
   areaEstudo            String?
+  concursos             String[]
+  areasEstudo           String[]
   dataProva             DateTime?
   linkTutory            String?
   dataUltimaAnalisePlano DateTime?

@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,6 +23,8 @@ interface AlunoEditavel {
   cursoPrincipal?: string | null
   plataformaQuestoes?: string | null
   areaEstudo?: string | null
+  concursos?: string[]
+  areasEstudo?: string[]
   linkTutory?: string | null
   incluiAcessoEstrategia?: boolean
   onboardingRespostas?: any[] | null
@@ -40,9 +42,74 @@ function toDateInput(val?: string | null) {
   return new Date(val).toISOString().split('T')[0]
 }
 
+function TagInput({
+  tags, onAdd, onRemove, placeholder, suggestions = [],
+}: {
+  tags: string[]; onAdd: (t: string) => void; onRemove: (t: string) => void
+  placeholder?: string; suggestions?: string[]
+}) {
+  const [input, setInput] = React.useState('')
+  const [open, setOpen] = React.useState(false)
+  const filtered = suggestions.filter(
+    (s) => s.toLowerCase().includes(input.toLowerCase()) && !tags.includes(s)
+  )
+  function commit(val: string) {
+    const v = val.trim().replace(/,$/, '')
+    if (v && !tags.includes(v)) onAdd(v)
+    setInput('')
+    setOpen(false)
+  }
+  return (
+    <div className="relative">
+      <div className="flex flex-wrap gap-1 p-1.5 rounded-lg border border-gray-200 min-h-[36px] focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-50 bg-white">
+        {tags.map((t) => (
+          <span key={t} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 rounded-md px-2 py-0.5 text-xs font-medium">
+            {t}
+            <button type="button" onClick={() => onRemove(t)} className="hover:text-indigo-900"><X size={10} /></button>
+          </span>
+        ))}
+        <input
+          className="flex-1 min-w-[100px] outline-none text-sm bg-transparent py-0.5"
+          value={input}
+          placeholder={tags.length === 0 ? placeholder : ''}
+          onChange={(e) => { setInput(e.target.value); setOpen(true) }}
+          onKeyDown={(e) => {
+            if ((e.key === 'Enter' || e.key === ',') && input.trim()) { e.preventDefault(); commit(input) }
+            if (e.key === 'Backspace' && !input && tags.length > 0) onRemove(tags[tags.length - 1])
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+        />
+      </div>
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-40 overflow-y-auto">
+          {filtered.map((s) => (
+            <button
+              key={s} type="button"
+              className="w-full text-left px-3 py-1.5 text-sm hover:bg-indigo-50 text-gray-700"
+              onMouseDown={() => commit(s)}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function EditarAlunoModal({ aluno, open, onClose, onSaved }: Props) {
   const [form, setForm] = useState({ ...aluno, dataEntrada: '', dataVencimento: '', dataProva: '' })
   const [saving, setSaving] = useState(false)
+  const [concursoSuggestions, setConcursoSuggestions] = React.useState<string[]>([])
+  const [areaEstudoSuggestions, setAreaEstudoSuggestions] = React.useState<string[]>([])
+
+  React.useEffect(() => {
+    fetch('/api/alunos/tags').then(r => r.json()).then(d => {
+      setConcursoSuggestions(d.concursos ?? [])
+      setAreaEstudoSuggestions(d.areasEstudo ?? [])
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (open) {
@@ -64,6 +131,8 @@ export function EditarAlunoModal({ aluno, open, onClose, onSaved }: Props) {
         cursoPrincipal: aluno.cursoPrincipal ?? '',
         plataformaQuestoes: aluno.plataformaQuestoes ?? '',
         areaEstudo: aluno.areaEstudo ?? '',
+        concursos:   Array.isArray(aluno.concursos)   ? aluno.concursos   : [],
+        areasEstudo: Array.isArray(aluno.areasEstudo) ? aluno.areasEstudo : [],
         linkTutory: aluno.linkTutory ?? '',
         incluiAcessoEstrategia: aluno.incluiAcessoEstrategia ?? false,
         concursoCargo,
@@ -113,6 +182,8 @@ export function EditarAlunoModal({ aluno, open, onClose, onSaved }: Props) {
           cursoPrincipal: (form as any).cursoPrincipal || null,
           plataformaQuestoes: (form as any).plataformaQuestoes || null,
           areaEstudo: (form as any).areaEstudo || null,
+          concursos:   (form as any).concursos   ?? [],
+          areasEstudo: (form as any).areasEstudo ?? [],
           linkTutory: (form as any).linkTutory || null,
           incluiAcessoEstrategia: (form as any).incluiAcessoEstrategia,
           onboardingRespostas: respostas,
@@ -235,11 +306,23 @@ export function EditarAlunoModal({ aluno, open, onClose, onSaved }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Concurso / Cargo</Label>
-                <Input value={(form as any).concursoCargo ?? ''} onChange={(e) => set('concursoCargo', e.target.value)} placeholder="Ex: TJ-SP — Técnico Judiciário" />
+                <TagInput
+                  tags={(form as any).concursos ?? []}
+                  onAdd={(t) => set('concursos', [...((form as any).concursos ?? []), t])}
+                  onRemove={(t) => set('concursos', ((form as any).concursos ?? []).filter((x: string) => x !== t))}
+                  placeholder="Ex: TJSC - TJAA (Enter para adicionar)"
+                  suggestions={concursoSuggestions}
+                />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Área de estudo</Label>
-                <Input value={(form as any).areaEstudo ?? ''} onChange={(e) => set('areaEstudo', e.target.value)} placeholder="Ex: Jurídica / Tribunais" />
+                <TagInput
+                  tags={(form as any).areasEstudo ?? []}
+                  onAdd={(t) => set('areasEstudo', [...((form as any).areasEstudo ?? []), t])}
+                  onRemove={(t) => set('areasEstudo', ((form as any).areasEstudo ?? []).filter((x: string) => x !== t))}
+                  placeholder="Ex: Jurídica / Tribunais (Enter para adicionar)"
+                  suggestions={areaEstudoSuggestions}
+                />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Curso principal</Label>

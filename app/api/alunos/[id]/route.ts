@@ -72,6 +72,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       ...(body.cursoPrincipal    !== undefined && { cursoPrincipal: body.cursoPrincipal || null }),
       ...(body.plataformaQuestoes !== undefined && { plataformaQuestoes: body.plataformaQuestoes || null }),
       ...(body.areaEstudo        !== undefined && { areaEstudo: body.areaEstudo || null }),
+      ...(body.concursos   !== undefined && { concursos:   body.concursos   }),
+      ...(body.areasEstudo !== undefined && { areasEstudo: body.areasEstudo }),
       ...(body.dataProva         !== undefined && { dataProva: parseDateOnly(body.dataProva) }),
       ...(body.linkTutory        !== undefined && { linkTutory: body.linkTutory || null }),
       ...(body.incluiAcessoEstrategia !== undefined && { incluiAcessoEstrategia: body.incluiAcessoEstrategia }),

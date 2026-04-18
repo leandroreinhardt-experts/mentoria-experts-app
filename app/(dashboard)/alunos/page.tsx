@@ -598,32 +598,34 @@ export default function AlunosPage() {
                   <td className="px-4 py-3">
                     {aluno.statusAtual === 'ATIVO' && <FaseBadge fase={aluno.faseAtual as FaseMentoria} />}
                   </td>
-                  <td className="px-4 py-3 max-w-[180px]">
+                  <td className="px-4 py-3">
                     {aluno.concursos?.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
-                        {aluno.concursos.slice(0, 2).map((c: string) => (
-                          <span key={c} className="inline-block px-1.5 py-0.5 rounded bg-sky-50 border border-sky-100 text-sky-700 text-[10px] font-medium truncate max-w-[160px]" title={c}>{c}</span>
+                        {aluno.concursos.slice(0, 1).map((c: string) => (
+                          <AnimatedBadge key={c} glowColor="rgba(14, 165, 233, 0.8)" className="text-[11px] bg-sky-50 text-sky-700 border border-sky-200 max-w-[160px] truncate" wrapperClassName="max-w-[160px]">
+                            <span className="truncate block" title={c}>{c}</span>
+                          </AnimatedBadge>
                         ))}
-                        {aluno.concursos.length > 2 && (
-                          <span className="text-[10px] text-gray-400">+{aluno.concursos.length - 2}</span>
+                        {aluno.concursos.length > 1 && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-medium border border-gray-200">+{aluno.concursos.length - 1}</span>
                         )}
                       </div>
                     ) : (
                       <span className="text-gray-300 text-[12px]">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 max-w-[160px]">
-                    {aluno.areasEstudo?.length > 0 ? (
+                  <td className="px-4 py-3">
+                    {(aluno.areasEstudo?.length > 0 || aluno.areaEstudo) ? (
                       <div className="flex flex-wrap gap-1">
-                        {aluno.areasEstudo.slice(0, 2).map((a: string) => (
-                          <span key={a} className="inline-block px-1.5 py-0.5 rounded bg-violet-50 border border-violet-100 text-violet-700 text-[10px] font-medium truncate max-w-[140px]" title={a}>{a}</span>
+                        {(aluno.areasEstudo?.length > 0 ? aluno.areasEstudo : [aluno.areaEstudo]).slice(0, 1).map((a: string) => (
+                          <AnimatedBadge key={a} glowColor="rgba(139, 92, 246, 0.8)" className="text-[11px] bg-violet-50 text-violet-700 border border-violet-200 max-w-[150px] truncate" wrapperClassName="max-w-[150px]">
+                            <span className="truncate block" title={a}>{a}</span>
+                          </AnimatedBadge>
                         ))}
-                        {aluno.areasEstudo.length > 2 && (
-                          <span className="text-[10px] text-gray-400">+{aluno.areasEstudo.length - 2}</span>
+                        {aluno.areasEstudo?.length > 1 && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-medium border border-gray-200">+{aluno.areasEstudo.length - 1}</span>
                         )}
                       </div>
-                    ) : aluno.areaEstudo ? (
-                      <span className="inline-block px-1.5 py-0.5 rounded bg-violet-50 border border-violet-100 text-violet-700 text-[10px] font-medium truncate max-w-[140px]" title={aluno.areaEstudo}>{aluno.areaEstudo}</span>
                     ) : (
                       <span className="text-gray-300 text-[12px]">—</span>
                     )}

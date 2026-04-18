@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { Plano, TipoTarefa, StatusTarefa } from '@prisma/client'
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -57,6 +58,23 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const body = await req.json()
+
+  // Se o plano está sendo alterado para START, cancela follow-ups pendentes
+  if (body.plano === Plano.START) {
+    const atual = await prisma.aluno.findUnique({
+      where: { id: params.id },
+      select: { plano: true },
+    })
+    if (atual && atual.plano !== Plano.START) {
+      await prisma.tarefa.deleteMany({
+        where: {
+          alunoId: params.id,
+          tipo: TipoTarefa.FOLLOWUP,
+          status: { in: [StatusTarefa.A_FAZER, StatusTarefa.EM_ANDAMENTO] },
+        },
+      })
+    }
+  }
 
   const aluno = await prisma.aluno.update({
     where: { id: params.id },

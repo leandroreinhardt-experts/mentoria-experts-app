@@ -7,7 +7,7 @@ import { signOut, useSession } from 'next-auth/react'
 import {
   LayoutDashboard, Users, Upload, CalendarDays, CheckSquare,
   Columns3, List, Trophy, Archive, Settings, UserCog, User,
-  LogOut, ChevronDown, ListTodo, LayoutGrid, Tag,
+  LogOut, ChevronDown, ListTodo, LayoutGrid, Tag, RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import React, { useState, useEffect } from 'react'
@@ -47,9 +47,10 @@ const navItems: NavItem[] = [
     label: 'Configurações',
     icon: <Settings size={15} />,
     children: [
-      { label: 'Membros do time', href: '/configuracoes/membros', icon: <UserCog size={14} /> },
-      { label: 'Minha conta',     href: '/configuracoes/conta',   icon: <User size={14} /> },
-      { label: 'Gerenciar Tags',  href: '/configuracoes/tags',    icon: <Tag size={14} /> },
+      { label: 'Membros do time',      href: '/configuracoes/membros',    icon: <UserCog size={14} /> },
+      { label: 'Minha conta',          href: '/configuracoes/conta',      icon: <User size={14} /> },
+      { label: 'Gerenciar Tags',       href: '/configuracoes/tags',       icon: <Tag size={14} /> },
+      { label: 'Reorganizar tarefas',  href: '/configuracoes/reorganizar', icon: <RefreshCw size={14} /> },
     ],
   },
 ]

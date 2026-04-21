@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { RichTextEditor, type RichTextEditorHandle } from '@/components/shared/RichTextEditor'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -87,7 +88,12 @@ export default function AlunoPerfilPage() {
   const [mencoes, setMencoes] = useState<string[]>([])
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const [mentionCursorStart, setMentionCursorStart] = useState(0)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const chatEditorRef = useRef<RichTextEditorHandle>(null)
+
+  // Edit follow-up
+  const [editFollowUpModal, setEditFollowUpModal] = useState(false)
+  const [editFollowUpId, setEditFollowUpId] = useState<string | null>(null)
+  const [editFollowUpObs, setEditFollowUpObs] = useState('')
 
   useEffect(() => {
     Promise.all([
@@ -128,6 +134,26 @@ export default function AlunoPerfilPage() {
     }
   }
 
+  async function editarFollowUp() {
+    if (!editFollowUpId) return
+    setSaving(true)
+    const res = await fetch(`/api/alunos/${id}/followups/${editFollowUpId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ observacao: editFollowUpObs }),
+    })
+    setSaving(false)
+    if (res.ok) {
+      toast({ title: 'Follow-up atualizado!', variant: 'success' })
+      setEditFollowUpModal(false)
+      setEditFollowUpId(null)
+      setEditFollowUpObs('')
+      recarregar()
+    } else {
+      toast({ title: 'Erro ao salvar', variant: 'destructive' })
+    }
+  }
+
   async function registrarAnalise() {
     const body: any = { observacao: analiseObs }
     if (analiseResponsavelId) body.responsavelId = analiseResponsavelId
@@ -144,9 +170,11 @@ export default function AlunoPerfilPage() {
   }
 
   async function adicionarComentario() {
-    if (!comentarioTexto.trim()) return
+    const isEmpty = !comentarioTexto || comentarioTexto === '<p></p>'
+    if (isEmpty) return
     const data = await post(`/api/alunos/${id}/comentarios`, { texto: comentarioTexto, mencoes })
     if (data) {
+      chatEditorRef.current?.clearContent()
       setComentarioTexto('')
       setMencoes([])
       setMentionQuery(null)
@@ -154,34 +182,29 @@ export default function AlunoPerfilPage() {
     }
   }
 
-  function handleComentarioChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    const text = e.target.value
-    setComentarioTexto(text)
-    const cursor = e.target.selectionStart ?? text.length
-    const beforeCursor = text.slice(0, cursor)
-    const match = beforeCursor.match(/@(\w*)$/)
+  function handleChatEditorChange(html: string) {
+    setComentarioTexto(html)
+    const editor = chatEditorRef.current?.getEditor()
+    if (!editor) return
+    const { from } = editor.state.selection
+    const textBefore = editor.state.doc.textBetween(Math.max(0, from - 50), from)
+    const match = textBefore.match(/@(\w*)$/)
     if (match) {
       setMentionQuery(match[1])
-      setMentionCursorStart(cursor - match[0].length)
+      setMentionCursorStart(from - match[0].length)
     } else {
       setMentionQuery(null)
     }
   }
 
   function selecionarMencao(membro: { id: string; nome: string }) {
+    const editor = chatEditorRef.current?.getEditor()
+    if (!editor) return
     const primeiroNome = membro.nome.split(' ')[0]
-    const cursor = textareaRef.current?.selectionStart ?? comentarioTexto.length
-    const before = comentarioTexto.slice(0, mentionCursorStart)
-    const after = comentarioTexto.slice(cursor)
-    const novoTexto = `${before}@${primeiroNome} ${after}`
-    setComentarioTexto(novoTexto)
+    const { from } = editor.state.selection
+    editor.chain().focus().deleteRange({ from: mentionCursorStart, to: from }).insertContent(`@${primeiroNome} `).run()
     setMencoes((prev) => (prev.includes(membro.id) ? prev : [...prev, membro.id]))
     setMentionQuery(null)
-    setTimeout(() => {
-      const pos = mentionCursorStart + primeiroNome.length + 2
-      textareaRef.current?.setSelectionRange(pos, pos)
-      textareaRef.current?.focus()
-    }, 0)
   }
 
   function renderTextoComMencoes(texto: string) {
@@ -664,11 +687,29 @@ export default function AlunoPerfilPage() {
           )}
           {aluno.followUps?.map((f: any) => (
             <div key={f.id} className="bg-white border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-gray-900">{f.responsavel?.nome}</span>
-                <span className="text-xs text-gray-500">{formatDateTime(f.realizadoEm)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">{formatDateTime(f.realizadoEm)}</span>
+                  <button
+                    onClick={() => {
+                      setEditFollowUpId(f.id)
+                      setEditFollowUpObs(f.observacao || '')
+                      setEditFollowUpModal(true)
+                    }}
+                    className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                    title="Editar follow-up"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                </div>
               </div>
-              {f.observacao && <p className="text-sm text-gray-600">{f.observacao}</p>}
+              {f.observacao && (
+                <div
+                  className="text-sm text-gray-600 rich-content"
+                  dangerouslySetInnerHTML={{ __html: f.observacao }}
+                />
+              )}
             </div>
           ))}
         </TabsContent>
@@ -814,16 +855,19 @@ export default function AlunoPerfilPage() {
                       <span className="text-[10px] text-gray-400 ml-auto">{formatDateTime(c.criadoEm)}</span>
                     </div>
                     <div className="ml-6 bg-gray-50 border border-gray-100 rounded-xl rounded-tl-none px-3 py-2">
-                      <p className="text-[13px] text-gray-800 whitespace-pre-wrap">{renderTextoComMencoes(c.texto)}</p>
+                      <div
+                        className="text-[13px] text-gray-800 rich-content [&_p]:my-0.5 [&_ul]:pl-4 [&_ol]:pl-4 [&_li]:my-0"
+                        dangerouslySetInnerHTML={{ __html: c.texto }}
+                      />
                     </div>
                   </div>
                 ))}
               </div>
               {/* Input */}
-              <div className="flex gap-2 items-end border-t pt-3 relative">
+              <div className="border-t pt-3 relative space-y-2">
                 {/* @mention dropdown */}
                 {mentionQuery !== null && membrosFiltrados.length > 0 && (
-                  <div className="absolute bottom-full left-0 right-10 mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
+                  <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
                     {membrosFiltrados.map((m: any) => (
                       <button
                         key={m.id}
@@ -838,34 +882,34 @@ export default function AlunoPerfilPage() {
                     ))}
                   </div>
                 )}
-                <Textarea
-                  ref={textareaRef}
-                  value={comentarioTexto}
-                  onChange={handleComentarioChange}
+                <RichTextEditor
+                  ref={chatEditorRef}
+                  onChange={handleChatEditorChange}
+                  placeholder="Escreva um comentário... (use @ para mencionar)"
+                  minHeight="60px"
                   onKeyDown={(e) => {
-                    if (e.key === 'Escape') { setMentionQuery(null); return }
+                    if (e.key === 'Escape') { setMentionQuery(null); return false }
                     if (mentionQuery !== null && membrosFiltrados.length > 0 && (e.key === 'Enter' || e.key === 'Tab')) {
-                      e.preventDefault()
                       selecionarMencao(membrosFiltrados[0])
-                      return
+                      return true
                     }
                     if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
                       adicionarComentario()
+                      return true
                     }
                   }}
-                  placeholder="Escreva um comentário... (use @ para mencionar)"
-                  rows={2}
-                  className="text-sm resize-none flex-1"
                 />
-                <Button
-                  size="icon"
-                  className="h-9 w-9 shrink-0"
-                  disabled={saving || !comentarioTexto.trim()}
-                  onClick={adicionarComentario}
-                >
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                </Button>
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    className="h-8 px-3"
+                    disabled={saving || !comentarioTexto || comentarioTexto === '<p></p>'}
+                    onClick={adicionarComentario}
+                  >
+                    {saving ? <Loader2 size={13} className="animate-spin mr-1.5" /> : <Send size={13} className="mr-1.5" />}
+                    Enviar
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -881,18 +925,47 @@ export default function AlunoPerfilPage() {
         onSaved={(atualizado) => setAluno((prev: any) => ({ ...prev, ...atualizado }))}
       />
 
-      <Dialog open={followUpModal} onOpenChange={setFollowUpModal}>
-        <DialogContent>
+      <Dialog open={followUpModal} onOpenChange={(open) => { setFollowUpModal(open); if (!open) setFollowUpObs('') }}>
+        <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Registrar follow-up</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-2">
             <Label>Observação</Label>
-            <Textarea value={followUpObs} onChange={(e) => setFollowUpObs(e.target.value)} placeholder="O que foi discutido..." rows={4} />
+            <RichTextEditor
+              key={followUpModal ? 'fu-open' : 'fu-closed'}
+              value={followUpObs}
+              onChange={setFollowUpObs}
+              placeholder="O que foi discutido..."
+              minHeight="120px"
+            />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setFollowUpModal(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setFollowUpModal(false); setFollowUpObs('') }}>Cancelar</Button>
             <Button onClick={registrarFollowUp} disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Registrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editFollowUpModal} onOpenChange={(open) => { setEditFollowUpModal(open); if (!open) { setEditFollowUpId(null); setEditFollowUpObs('') } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Editar follow-up</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <Label>Observação</Label>
+            <RichTextEditor
+              key={editFollowUpId ?? 'edit-fu'}
+              value={editFollowUpObs}
+              onChange={setEditFollowUpObs}
+              placeholder="O que foi discutido..."
+              minHeight="120px"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditFollowUpModal(false)}>Cancelar</Button>
+            <Button onClick={editarFollowUp} disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar
             </Button>
           </DialogFooter>
         </DialogContent>
